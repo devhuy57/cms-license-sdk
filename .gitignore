@@ -1,0 +1,5 @@
+node_modules
+*.log
+.DS_Store
+# NOTE: dist/ is intentionally COMMITTED so `pnpm add github:...` works without a
+# build step on the consumer. Rebuild with `npm run build` after changing src.
