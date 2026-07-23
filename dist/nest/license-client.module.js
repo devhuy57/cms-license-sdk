@@ -11,7 +11,9 @@ exports.LicenseClientModule = void 0;
 const common_1 = require("@nestjs/common");
 const constants_1 = require("./constants");
 const ed25519_token_verifier_1 = require("./ed25519-token-verifier");
+const key_store_1 = require("./key-store");
 const file_token_cache_1 = require("./file-token-cache");
+const license_activate_controller_1 = require("./license-activate.controller");
 const license_authority_http_client_1 = require("./license-authority.http-client");
 const license_client_service_1 = require("./license-client.service");
 const license_gate_1 = require("./license-gate");
@@ -20,13 +22,17 @@ const ports_1 = require("./ports");
  * Reusable license enforcement client. Verifies the signed license with the
  * authority, gates boot when `enforce`, re-checks on a heartbeat, and exposes
  * `LicenseClientService`. Global so the service (and Phase B runtime secret) is
- * injectable anywhere. Bring your own status controller (auth is app-specific).
+ * injectable anywhere. Bring your own status controller (auth is app-specific);
+ * a PUBLIC activate controller is mounted only when `enableActivationEndpoint`.
  */
 let LicenseClientModule = LicenseClientModule_1 = class LicenseClientModule {
     static forRoot(options) {
         return {
             module: LicenseClientModule_1,
             global: true,
+            controllers: options.enableActivationEndpoint
+                ? [license_activate_controller_1.LicenseActivateController]
+                : [],
             providers: [
                 { provide: constants_1.LICENSE_CLIENT_OPTIONS, useValue: options },
                 {
@@ -42,6 +48,11 @@ let LicenseClientModule = LicenseClientModule_1 = class LicenseClientModule {
                 {
                     provide: ports_1.TOKEN_CACHE,
                     useFactory: (o) => new file_token_cache_1.FileTokenCache(o.cachePath),
+                    inject: [constants_1.LICENSE_CLIENT_OPTIONS],
+                },
+                {
+                    provide: key_store_1.KEY_STORE,
+                    useFactory: (o) => new key_store_1.FileKeyStore(o.keyStorePath || constants_1.DEFAULT_KEY_STORE_PATH),
                     inject: [constants_1.LICENSE_CLIENT_OPTIONS],
                 },
                 license_client_service_1.LicenseClientService,

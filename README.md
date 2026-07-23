@@ -6,7 +6,8 @@ Reusable Ed25519 license SDK, shared across products. Three entrypoints:
 |---|---|---|
 | `@cmsnt/license-sdk/core` | Node (`node:crypto`) | License **server** (sign) + Node **backends** (verify) |
 | `@cmsnt/license-sdk/nest` | NestJS | **Backend** enforcement client (verify + boot gate + heartbeat) |
-| `@cmsnt/license-sdk/edge` | Web Crypto (`crypto.subtle`) | **Frontend** / edge (Next.js middleware, browser) verify |
+| `@cmsnt/license-sdk/edge` | Web Crypto (`crypto.subtle`) | **Frontend** / edge (browser) verify — framework-agnostic |
+| `@cmsnt/license-sdk/next` | Next.js middleware | **Self-served activation** gate: renders its own key-entry form + cookie |
 
 A token is `base64url(claimsJSON).base64url(ed25519Signature)`. The raw license
 key never travels — only its SHA-256 (`sub`). Only the license server holds the
@@ -128,6 +129,53 @@ level `verifyLicenseToken(token, publicKey)`.
 > **Edge runtime note:** verification uses Web Crypto `crypto.subtle` with
 > `Ed25519`. Ensure your runtime supports it (Node 18+ and recent Next.js edge
 > runtimes do).
+
+## `next` — self-served activation middleware
+
+When the license is invalid, the middleware **renders its own key-entry form**
+(no page in your app source) and, on a valid submit, stores the key in an
+httpOnly cookie — the app then unlocks. Your `middleware.ts` only calls the
+factory:
+
+```ts
+// apps/<app>/middleware.ts
+import { createLicenseMiddleware } from '@cmsnt/license-sdk/next';
+import { NextResponse } from 'next/server';
+
+const gate = createLicenseMiddleware({
+  serverUrl: process.env.NEXT_PUBLIC_LICENSE_SERVER_URL!,
+  licenseKey: process.env.NEXT_PUBLIC_LICENSE_KEY,       // build-time fallback
+  publicKey: process.env.NEXT_PUBLIC_LICENSE_PUBLIC_KEY, // SDK also defaults to this
+  // Optional: sync the accepted key to the backend (the REAL enforcement point):
+  backendActivateUrl: `${process.env.NEXT_PUBLIC_SERVER_URL}/v1/license/activate`,
+});
+
+export async function middleware(req) {
+  return (await gate(req)) ?? NextResponse.next();
+}
+export const config = { matcher: ['/((?!api|_next|_vercel|static|favicon.ico|.*\\..*).*)'] };
+```
+
+Key resolution order: activation **cookie** → `licenseKey` option →
+`NEXT_PUBLIC_LICENSE_KEY`. The submitted key is verified (signature) before
+acceptance, so a bogus key can't unlock.
+
+**Backend sync** — mount the public activation endpoint so the entered key also
+reaches the real gate:
+
+```ts
+LicenseClientModule.forRoot({ ...cfg.licenseClient, enableActivationEndpoint: true })
+// exposes PUBLIC  POST /v1/license/activate  { licenseKey }  → { valid, fresh, reason }
+// a valid key is persisted (keyStorePath, default .license/active-key) and adopted.
+```
+
+> **Honest limits.** FE checks are cosmetic (the strategy's real gate is the
+> backend boot gate); the `createLicenseMiddleware` call still lives in the app's
+> `middleware.ts`, so a source-editing customer can remove it — this *raises the
+> cost*, it is not tamper-proof. Backend self-activation only works while the
+> backend is running: with `enforce: true` and a hard-invalid license the process
+> exits, so recover via env + redeploy. Run `enforce: false` during onboarding to
+> allow runtime activation.
 
 ## Develop
 

@@ -1,5 +1,6 @@
 import { LicenseTokenClaims } from '../core';
 import { LicenseClientModuleOptions } from './constants';
+import { KeyStorePort } from './key-store';
 import { LicenseClientService } from './license-client.service';
 import {
   LicenseAuthorityPort,
@@ -48,6 +49,7 @@ function build(parts: {
   authority?: Partial<LicenseAuthorityPort>;
   verifier?: Partial<TokenVerifierPort>;
   cache?: Partial<TokenCachePort>;
+  keyStore?: Partial<KeyStorePort>;
 }) {
   const authority = {
     verify: jest.fn(),
@@ -62,9 +64,21 @@ function build(parts: {
     write: jest.fn().mockResolvedValue(undefined),
     ...parts.cache,
   } as unknown as TokenCachePort;
+  const keyStore = {
+    read: jest.fn().mockResolvedValue(null),
+    write: jest.fn().mockResolvedValue(undefined),
+    ...parts.keyStore,
+  } as unknown as KeyStorePort;
   return {
-    service: new LicenseClientService(options, authority, verifier, cache),
+    service: new LicenseClientService(
+      options,
+      authority,
+      verifier,
+      cache,
+      keyStore,
+    ),
     cache,
+    keyStore,
   };
 }
 
@@ -164,5 +178,44 @@ describe('license-sdk/nest LicenseClientService', () => {
       cache: { read: jest.fn().mockResolvedValue(null) },
     });
     expect((await service.refresh()).reason).toBe('offline_no_cache');
+  });
+
+  it('refresh() prefers the stored (activated) key over the configured one', async () => {
+    const authority = { verify: jest.fn().mockResolvedValue({ valid: true, reason: null, status: 'active', token: 'tok' }) };
+    const { service } = build({
+      authority,
+      verifier: { verify: jest.fn().mockReturnValue(claims()) },
+      keyStore: { read: jest.fn().mockResolvedValue('ACTIVATED-KEY') },
+    });
+    await service.refresh();
+    expect(authority.verify).toHaveBeenCalledWith(
+      expect.objectContaining({ licenseKey: 'ACTIVATED-KEY' }),
+    );
+  });
+
+  it('activate() persists the key only when it verifies valid', async () => {
+    const { service, keyStore } = build({
+      authority: okOnline,
+      verifier: { verify: jest.fn().mockReturnValue(claims()) },
+    });
+    const state = await service.activate('NEW-KEY');
+    expect(state.valid).toBe(true);
+    expect(keyStore.write).toHaveBeenCalledWith('NEW-KEY');
+  });
+
+  it('activate() does NOT persist an invalid key', async () => {
+    const { service, keyStore } = build({
+      authority: {
+        verify: jest.fn().mockResolvedValue({
+          valid: false,
+          reason: 'revoked',
+          status: 'revoked',
+          token: null,
+        }),
+      },
+    });
+    const state = await service.activate('BAD-KEY');
+    expect(state.valid).toBe(false);
+    expect(keyStore.write).not.toHaveBeenCalled();
   });
 });

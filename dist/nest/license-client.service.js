@@ -18,6 +18,7 @@ const common_1 = require("@nestjs/common");
 const core_1 = require("../core");
 const constants_1 = require("./constants");
 const ports_1 = require("./ports");
+const key_store_1 = require("./key-store");
 const INITIAL_STATE = {
     valid: false,
     fresh: false,
@@ -32,13 +33,55 @@ const INITIAL_STATE = {
  * product's status endpoint, and (Phase B) the per-license runtime secret.
  */
 let LicenseClientService = LicenseClientService_1 = class LicenseClientService {
-    constructor(options, authority, verifier, cache) {
+    constructor(options, authority, verifier, cache, keyStore) {
         this.options = options;
         this.authority = authority;
         this.verifier = verifier;
         this.cache = cache;
+        this.keyStore = keyStore;
         this.logger = new common_1.Logger(LicenseClientService_1.name);
         this.state = INITIAL_STATE;
+    }
+    /** The active key: a runtime-activated key (if any) overrides the config. */
+    async activeKey() {
+        return (await this.keyStore.read()) || this.options.licenseKey;
+    }
+    /**
+     * Apply a new key at runtime: verify it online, and only if valid persist it
+     * (so it survives restarts and overrides the configured key), cache its token,
+     * and adopt it as current state. Returns the resulting state.
+     */
+    async activate(licenseKey) {
+        const key = licenseKey.trim();
+        if (!key) {
+            return this.set({
+                valid: false,
+                fresh: true,
+                claims: null,
+                reason: 'server_invalid',
+                now: new Date(),
+            });
+        }
+        let state;
+        try {
+            state = await this.verifyOnline(key, new Date());
+        }
+        catch (err) {
+            if (err instanceof ports_1.LicenseAuthorityUnreachableError) {
+                this.logger.warn(`Activation failed — authority unreachable (${err.message}).`);
+                return this.set({
+                    valid: false,
+                    fresh: true,
+                    claims: null,
+                    reason: 'server_invalid',
+                    now: new Date(),
+                });
+            }
+            throw err;
+        }
+        if (state.valid)
+            await this.keyStore.write(key);
+        return state;
     }
     getState() {
         return this.state;
@@ -56,13 +99,9 @@ let LicenseClientService = LicenseClientService_1 = class LicenseClientService {
     async refresh() {
         const now = new Date();
         const nowSec = Math.floor(now.getTime() / 1000);
-        const domain = this.options.domain.trim() || null;
-        let online;
+        const key = await this.activeKey();
         try {
-            online = await this.authority.verify({
-                licenseKey: this.options.licenseKey,
-                domain,
-            });
+            return await this.verifyOnline(key, now);
         }
         catch (err) {
             if (err instanceof ports_1.LicenseAuthorityUnreachableError) {
@@ -71,6 +110,15 @@ let LicenseClientService = LicenseClientService_1 = class LicenseClientService {
             }
             throw err;
         }
+    }
+    /**
+     * Online verification for `licenseKey`: authority → signature → claims → cache.
+     * Throws {@link LicenseAuthorityUnreachableError} when the authority can't be
+     * reached (caller decides whether to fall back to cache).
+     */
+    async verifyOnline(licenseKey, now) {
+        const domain = this.options.domain.trim() || null;
+        const online = await this.authority.verify({ licenseKey, domain });
         if (!online.token) {
             const reason = online.valid
                 ? 'no_token'
@@ -171,5 +219,6 @@ exports.LicenseClientService = LicenseClientService = LicenseClientService_1 = _
     __param(1, (0, common_1.Inject)(ports_1.LICENSE_AUTHORITY)),
     __param(2, (0, common_1.Inject)(ports_1.TOKEN_VERIFIER)),
     __param(3, (0, common_1.Inject)(ports_1.TOKEN_CACHE)),
-    __metadata("design:paramtypes", [Object, Object, Object, Object])
+    __param(4, (0, common_1.Inject)(key_store_1.KEY_STORE)),
+    __metadata("design:paramtypes", [Object, Object, Object, Object, Object])
 ], LicenseClientService);

@@ -10,6 +10,7 @@ import {
   TokenCachePort,
   TokenVerifierPort,
 } from './ports';
+import { KEY_STORE, KeyStorePort } from './key-store';
 import { LicenseClientReason, LicenseClientState } from './state';
 
 const INITIAL_STATE: LicenseClientState = {
@@ -37,7 +38,51 @@ export class LicenseClientService {
     @Inject(LICENSE_AUTHORITY) private readonly authority: LicenseAuthorityPort,
     @Inject(TOKEN_VERIFIER) private readonly verifier: TokenVerifierPort,
     @Inject(TOKEN_CACHE) private readonly cache: TokenCachePort,
+    @Inject(KEY_STORE) private readonly keyStore: KeyStorePort,
   ) {}
+
+  /** The active key: a runtime-activated key (if any) overrides the config. */
+  private async activeKey(): Promise<string> {
+    return (await this.keyStore.read()) || this.options.licenseKey;
+  }
+
+  /**
+   * Apply a new key at runtime: verify it online, and only if valid persist it
+   * (so it survives restarts and overrides the configured key), cache its token,
+   * and adopt it as current state. Returns the resulting state.
+   */
+  async activate(licenseKey: string): Promise<LicenseClientState> {
+    const key = licenseKey.trim();
+    if (!key) {
+      return this.set({
+        valid: false,
+        fresh: true,
+        claims: null,
+        reason: 'server_invalid',
+        now: new Date(),
+      });
+    }
+    let state: LicenseClientState;
+    try {
+      state = await this.verifyOnline(key, new Date());
+    } catch (err) {
+      if (err instanceof LicenseAuthorityUnreachableError) {
+        this.logger.warn(
+          `Activation failed — authority unreachable (${err.message}).`,
+        );
+        return this.set({
+          valid: false,
+          fresh: true,
+          claims: null,
+          reason: 'server_invalid',
+          now: new Date(),
+        });
+      }
+      throw err;
+    }
+    if (state.valid) await this.keyStore.write(key);
+    return state;
+  }
 
   getState(): LicenseClientState {
     return this.state;
@@ -59,14 +104,9 @@ export class LicenseClientService {
   async refresh(): Promise<LicenseClientState> {
     const now = new Date();
     const nowSec = Math.floor(now.getTime() / 1000);
-    const domain = this.options.domain.trim() || null;
-
-    let online;
+    const key = await this.activeKey();
     try {
-      online = await this.authority.verify({
-        licenseKey: this.options.licenseKey,
-        domain,
-      });
+      return await this.verifyOnline(key, now);
     } catch (err) {
       if (err instanceof LicenseAuthorityUnreachableError) {
         this.logger.warn(
@@ -76,6 +116,19 @@ export class LicenseClientService {
       }
       throw err;
     }
+  }
+
+  /**
+   * Online verification for `licenseKey`: authority → signature → claims → cache.
+   * Throws {@link LicenseAuthorityUnreachableError} when the authority can't be
+   * reached (caller decides whether to fall back to cache).
+   */
+  private async verifyOnline(
+    licenseKey: string,
+    now: Date,
+  ): Promise<LicenseClientState> {
+    const domain = this.options.domain.trim() || null;
+    const online = await this.authority.verify({ licenseKey, domain });
 
     if (!online.token) {
       const reason: LicenseClientReason = online.valid

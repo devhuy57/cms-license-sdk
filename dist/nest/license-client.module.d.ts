@@ -4,7 +4,8 @@ import { LicenseClientModuleOptions } from './constants';
  * Reusable license enforcement client. Verifies the signed license with the
  * authority, gates boot when `enforce`, re-checks on a heartbeat, and exposes
  * `LicenseClientService`. Global so the service (and Phase B runtime secret) is
- * injectable anywhere. Bring your own status controller (auth is app-specific).
+ * injectable anywhere. Bring your own status controller (auth is app-specific);
+ * a PUBLIC activate controller is mounted only when `enableActivationEndpoint`.
  */
 export declare class LicenseClientModule {
     static forRoot(options: LicenseClientModuleOptions): DynamicModule;

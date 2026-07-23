@@ -9,6 +9,13 @@ export interface LicenseClientModuleOptions {
   requiredFeature: string;
   enforce: boolean;
   requestTimeoutMs: number;
+  /** File that persists a runtime-activated key (overrides `licenseKey`). */
+  keyStorePath?: string;
+  /** Mount a PUBLIC `POST /license/activate` so a new key can be applied at
+   *  runtime (the key is verified before it is accepted). Default false. */
+  enableActivationEndpoint?: boolean;
 }
 
 export const LICENSE_CLIENT_OPTIONS = Symbol('LICENSE_CLIENT_OPTIONS');
+
+export const DEFAULT_KEY_STORE_PATH = '.license/active-key';
