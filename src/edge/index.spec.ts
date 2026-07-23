@@ -44,4 +44,14 @@ describe('license-sdk/edge', () => {
   it('returns null for a malformed token', async () => {
     expect(await verifyLicenseToken('nope', pub)).toBeNull();
   });
+
+  it('falls back to NEXT_PUBLIC_LICENSE_PUBLIC_KEY when no key is passed', async () => {
+    const prev = process.env.NEXT_PUBLIC_LICENSE_PUBLIC_KEY;
+    process.env.NEXT_PUBLIC_LICENSE_PUBLIC_KEY = pub;
+    try {
+      expect((await verifyLicenseToken(token))?.productId).toBe('prod-1');
+    } finally {
+      process.env.NEXT_PUBLIC_LICENSE_PUBLIC_KEY = prev;
+    }
+  });
 });

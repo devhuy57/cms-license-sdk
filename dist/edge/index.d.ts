@@ -23,7 +23,7 @@ export interface LicenseCheckResult {
  * Verify the token's Ed25519 signature with `publicKey`; return decoded claims
  * or null when malformed / the signature does not match.
  */
-export declare function verifyLicenseToken(token: string, publicKey: string): Promise<LicenseTokenClaims | null>;
+export declare function verifyLicenseToken(token: string, publicKey?: string): Promise<LicenseTokenClaims | null>;
 /**
  * Call the license server's `POST /v1/licenses/verify` and, when a public key
  * is configured AND the server returned a signed token, trust the Ed25519

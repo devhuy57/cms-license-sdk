@@ -49,7 +49,8 @@ export declare const isLicenseExpired: (claims: LicenseTokenClaims, now: Date) =
  */
 export declare class Ed25519LicenseSigner {
     private readonly key;
-    constructor(privateKeyPem: string);
+    /** Falls back to `process.env.LICENSE_PRIVATE_KEY_PEM` when omitted. */
+    constructor(privateKeyPem?: string);
     sign(claims: LicenseTokenClaims): string;
 }
 /**
@@ -58,7 +59,8 @@ export declare class Ed25519LicenseSigner {
  */
 export declare class Ed25519LicenseVerifier {
     private readonly key;
-    constructor(publicKeyPem: string);
+    /** Falls back to `process.env.LICENSE_PUBLIC_KEY` when omitted. */
+    constructor(publicKeyPem?: string);
     verify(token: string): LicenseTokenClaims;
 }
 /** Accept a full PEM or base64-of-PEM (env-var friendly). */

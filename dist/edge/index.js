@@ -43,6 +43,24 @@ function spkiFromPublicKey(publicKey) {
         : s.replace(/\s+/g, '');
     return base64ToBytes(body);
 }
+/**
+ * Resolve the public key: explicit arg wins, else the build-time
+ * `NEXT_PUBLIC_LICENSE_PUBLIC_KEY` (inlined by Next for browser/edge; set it as
+ * an OS/CI env var at build — no `.env` file required). Returns '' if unset.
+ */
+function resolvePublicKey(explicit) {
+    if (explicit && explicit.trim())
+        return explicit;
+    try {
+        return ((typeof process !== 'undefined' &&
+            process.env &&
+            process.env.NEXT_PUBLIC_LICENSE_PUBLIC_KEY) ||
+            '');
+    }
+    catch {
+        return '';
+    }
+}
 let cachedKey = null;
 let cachedFor = '';
 async function importKey(publicKey) {
@@ -59,11 +77,12 @@ async function importKey(publicKey) {
  * or null when malformed / the signature does not match.
  */
 async function verifyLicenseToken(token, publicKey) {
+    const resolvedKey = resolvePublicKey(publicKey);
     const [payload, sig] = token.split('.');
-    if (!payload || !sig)
+    if (!payload || !sig || !resolvedKey)
         return null;
     try {
-        const key = await importKey(publicKey);
+        const key = await importKey(resolvedKey);
         const signatureBytes = base64UrlToBytes(sig);
         const payloadBytes = new TextEncoder().encode(payload);
         const ok = await crypto.subtle.verify({ name: 'Ed25519' }, key, signatureBytes.buffer, payloadBytes.buffer);
@@ -96,8 +115,9 @@ async function checkLicense(params) {
         const json = await res.json();
         const data = json?.data ?? {};
         const token = data.token ?? undefined;
-        if (params.publicKey && token) {
-            const claims = await verifyLicenseToken(token, params.publicKey);
+        const publicKey = resolvePublicKey(params.publicKey);
+        if (publicKey && token) {
+            const claims = await verifyLicenseToken(token, publicKey);
             if (!claims)
                 return { valid: false, status: 'error', reason: 'bad_signature' };
             if (claims.licenseExpiresAt &&

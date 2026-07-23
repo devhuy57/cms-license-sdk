@@ -63,6 +63,20 @@ describe('license-sdk/core', () => {
     );
   });
 
+  it('signer/verifier fall back to OS env when no key is passed', () => {
+    const prevPriv = process.env.LICENSE_PRIVATE_KEY_PEM;
+    const prevPub = process.env.LICENSE_PUBLIC_KEY;
+    process.env.LICENSE_PRIVATE_KEY_PEM = priv;
+    process.env.LICENSE_PUBLIC_KEY = pub;
+    try {
+      const token = new Ed25519LicenseSigner().sign(claims);
+      expect(new Ed25519LicenseVerifier().verify(token).productId).toBe('prod-1');
+    } finally {
+      process.env.LICENSE_PRIVATE_KEY_PEM = prevPriv;
+      process.env.LICENSE_PUBLIC_KEY = prevPub;
+    }
+  });
+
   it('verifier accepts base64-of-PEM public key', () => {
     const b64 = Buffer.from(pub, 'utf8').toString('base64');
     const token = new Ed25519LicenseSigner(priv).sign(claims);

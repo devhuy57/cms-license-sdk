@@ -21,6 +21,24 @@ pnpm add github:devhuy57/cms-license-sdk#v0.1.0
 The package name (for imports) is `@cmsnt/license-sdk`; the git repo is
 `devhuy57/cms-license-sdk`. `dist/` is committed, so no build step runs on install.
 
+## Zero-wiring via environment variables
+
+Every entrypoint falls back to an env var when you don't pass a key explicitly —
+so a product can just set the OS/CI env var, no code wiring and no `.env` file
+required:
+
+| Entrypoint | Env var (fallback) | Read at |
+|---|---|---|
+| `core` server (`Ed25519LicenseSigner()`) | `LICENSE_PRIVATE_KEY_PEM` | runtime (Node) |
+| `core` / `nest` verify | `LICENSE_PUBLIC_KEY` | runtime (Node) |
+| `edge` (`checkLicense` / `verifyLicenseToken`) | `NEXT_PUBLIC_LICENSE_PUBLIC_KEY` | **build time** (Next inlines it) |
+
+> **Node** (server/backend) reads the OS env at runtime — set it however you
+> deploy. **Browser/edge** cannot read OS env at runtime: Next inlines
+> `NEXT_PUBLIC_LICENSE_PUBLIC_KEY` at `build` time, so set it in the OS/CI before
+> building; the `NEXT_PUBLIC_` prefix is mandatory. Keys are public, so this is
+> safe. An explicit argument always overrides the env fallback.
+
 ## Generate a keypair (once)
 
 ```js

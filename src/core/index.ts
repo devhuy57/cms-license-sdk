@@ -101,8 +101,11 @@ export const isLicenseExpired = (claims: LicenseTokenClaims, now: Date) =>
 export class Ed25519LicenseSigner {
   private readonly key: KeyObject;
 
-  constructor(privateKeyPem: string) {
-    const pem = privateKeyPem?.trim();
+  /** Falls back to `process.env.LICENSE_PRIVATE_KEY_PEM` when omitted. */
+  constructor(privateKeyPem?: string) {
+    const pem = normalizePem(
+      privateKeyPem?.trim() ? privateKeyPem : readEnv('LICENSE_PRIVATE_KEY_PEM'),
+    );
     if (!pem) throw new Error('license-core: privateKeyPem is required');
     this.key = createPrivateKey(pem);
     if (this.key.asymmetricKeyType !== 'ed25519') {
@@ -126,8 +129,11 @@ export class Ed25519LicenseSigner {
 export class Ed25519LicenseVerifier {
   private readonly key: KeyObject;
 
-  constructor(publicKeyPem: string) {
-    const pem = normalizePem(publicKeyPem);
+  /** Falls back to `process.env.LICENSE_PUBLIC_KEY` when omitted. */
+  constructor(publicKeyPem?: string) {
+    const pem = normalizePem(
+      publicKeyPem?.trim() ? publicKeyPem : readEnv('LICENSE_PUBLIC_KEY'),
+    );
     if (!pem) throw new Error('license-core: publicKeyPem is required');
     this.key = createPublicKey(pem);
     if (this.key.asymmetricKeyType !== 'ed25519') {
@@ -146,6 +152,17 @@ export class Ed25519LicenseVerifier {
     );
     if (!ok) throw new Error('signature verification failed');
     return decodeLicenseTokenPayload(token);
+  }
+}
+
+/** Safe process.env read (never throws, works if `process` is absent). */
+function readEnv(name: string): string {
+  try {
+    return (
+      (typeof process !== 'undefined' && process.env && process.env[name]) || ''
+    );
+  } catch {
+    return '';
   }
 }
 

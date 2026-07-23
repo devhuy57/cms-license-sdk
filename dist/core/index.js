@@ -54,8 +54,9 @@ exports.isLicenseExpired = isLicenseExpired;
  * `sign()` returns a `payload.signature` token. Throws if the key is not Ed25519.
  */
 class Ed25519LicenseSigner {
+    /** Falls back to `process.env.LICENSE_PRIVATE_KEY_PEM` when omitted. */
     constructor(privateKeyPem) {
-        const pem = privateKeyPem?.trim();
+        const pem = normalizePem(privateKeyPem?.trim() ? privateKeyPem : readEnv('LICENSE_PRIVATE_KEY_PEM'));
         if (!pem)
             throw new Error('license-core: privateKeyPem is required');
         this.key = (0, node_crypto_1.createPrivateKey)(pem);
@@ -75,8 +76,9 @@ exports.Ed25519LicenseSigner = Ed25519LicenseSigner;
  * base64 of it). `verify()` returns the claims or throws on malformed/bad-sig.
  */
 class Ed25519LicenseVerifier {
+    /** Falls back to `process.env.LICENSE_PUBLIC_KEY` when omitted. */
     constructor(publicKeyPem) {
-        const pem = normalizePem(publicKeyPem);
+        const pem = normalizePem(publicKeyPem?.trim() ? publicKeyPem : readEnv('LICENSE_PUBLIC_KEY'));
         if (!pem)
             throw new Error('license-core: publicKeyPem is required');
         this.key = (0, node_crypto_1.createPublicKey)(pem);
@@ -95,6 +97,15 @@ class Ed25519LicenseVerifier {
     }
 }
 exports.Ed25519LicenseVerifier = Ed25519LicenseVerifier;
+/** Safe process.env read (never throws, works if `process` is absent). */
+function readEnv(name) {
+    try {
+        return ((typeof process !== 'undefined' && process.env && process.env[name]) || '');
+    }
+    catch {
+        return '';
+    }
+}
 /** Accept a full PEM or base64-of-PEM (env-var friendly). */
 function normalizePem(value) {
     const trimmed = value?.trim();
