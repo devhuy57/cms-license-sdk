@@ -1,6 +1,6 @@
 {
   "name": "@cmsnt/license-sdk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Reusable Ed25519 license SDK: token core, NestJS enforcement client, and edge (Web Crypto) verifier.",
   "license": "UNLICENSED",
   "private": false,
@@ -20,6 +20,19 @@
     "./edge": {
       "types": "./dist/edge/index.d.ts",
       "default": "./dist/edge/index.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "core": [
+        "dist/core/index.d.ts"
+      ],
+      "nest": [
+        "dist/nest/index.d.ts"
+      ],
+      "edge": [
+        "dist/edge/index.d.ts"
+      ]
     }
   },
   "scripts": {
