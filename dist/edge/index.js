@@ -18,14 +18,29 @@ function base64UrlToBytes(b64url) {
     const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
     return base64ToBytes(b64 + pad);
 }
-/** Accept a full SPKI PEM or the bare base64 body. */
+/**
+ * Extract the SPKI DER bytes from any of: a full SPKI PEM, base64 of the whole
+ * PEM (what `keygen --base64` emits), or the bare base64 DER body.
+ */
 function spkiFromPublicKey(publicKey) {
-    const body = publicKey.includes('BEGIN')
-        ? publicKey
+    let s = publicKey.trim();
+    if (!s.includes('BEGIN')) {
+        // Could be base64-of-PEM — decode once and see if a PEM surfaces.
+        try {
+            const decoded = atob(s.replace(/\s+/g, ''));
+            if (decoded.includes('BEGIN'))
+                s = decoded;
+        }
+        catch {
+            /* not base64 — fall through */
+        }
+    }
+    const body = s.includes('BEGIN')
+        ? s
             .replace(/-----BEGIN[^-]+-----/, '')
             .replace(/-----END[^-]+-----/, '')
             .replace(/\s+/g, '')
-        : publicKey.replace(/\s+/g, '');
+        : s.replace(/\s+/g, '');
     return base64ToBytes(body);
 }
 let cachedKey = null;
