@@ -15,10 +15,11 @@ private key; everything shipped to customers embeds the public key (verify-only)
 ## Install (git dependency)
 
 ```bash
-pnpm add github:<org>/license-sdk#v0.1.0
+pnpm add github:devhuy57/cms-license-sdk#v0.1.0
 ```
 
-`dist/` is committed, so no build step runs on install.
+The package name (for imports) is `@cmsnt/license-sdk`; the git repo is
+`devhuy57/cms-license-sdk`. `dist/` is committed, so no build step runs on install.
 
 ## Generate a keypair (once)
 
