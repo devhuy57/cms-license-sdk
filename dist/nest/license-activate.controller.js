@@ -16,11 +16,16 @@ exports.LicenseActivateController = void 0;
 const common_1 = require("@nestjs/common");
 const license_client_service_1 = require("./license-client.service");
 /**
- * PUBLIC activation endpoint (`POST /license/activate`). Accepts a license key,
- * verifies it against the authority, and — only if valid — persists it as the
- * active key and adopts it (no restart needed). Public because the key itself is
- * the credential; it cannot grant validity a forged key wouldn't already have.
- * Mounted only when `enableActivationEndpoint` is set. Rate-limit it upstream.
+ * PUBLIC license endpoints for self-served installs. Mounted only when
+ * `enableActivationEndpoint` is set. Rate-limit them upstream.
+ *
+ * - `POST /license/activate` — accept a key, verify online, persist if valid.
+ * - `GET  /license/status`  — whether this install is already licensed (no key
+ *   leaked). Front-end gates use this so one activation unlocks every browser.
+ *
+ * Public because the key itself is the credential on activate, and status only
+ * exposes a boolean that the cosmetic FE gate already needs. Real enforcement
+ * stays on the backend boot gate / `LicenseClientService`.
  *
  * Uses `@Body('licenseKey')` (not a DTO class) so it needs no class-validator
  * dependency and isn't stripped by a host `whitelist` ValidationPipe.
@@ -29,12 +34,23 @@ let LicenseActivateController = class LicenseActivateController {
     constructor(licenses) {
         this.licenses = licenses;
     }
+    status() {
+        const state = this.licenses.getState();
+        return { valid: state.valid, fresh: state.fresh, reason: state.reason };
+    }
     async activate(licenseKey) {
         const state = await this.licenses.activate(licenseKey ?? '');
         return { valid: state.valid, fresh: state.fresh, reason: state.reason };
     }
 };
 exports.LicenseActivateController = LicenseActivateController;
+__decorate([
+    (0, common_1.Get)('status'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Object)
+], LicenseActivateController.prototype, "status", null);
 __decorate([
     (0, common_1.Post)('activate'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),

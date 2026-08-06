@@ -23,7 +23,8 @@ const ports_1 = require("./ports");
  * authority, gates boot when `enforce`, re-checks on a heartbeat, and exposes
  * `LicenseClientService`. Global so the service (and Phase B runtime secret) is
  * injectable anywhere. Bring your own status controller (auth is app-specific);
- * a PUBLIC activate controller is mounted only when `enableActivationEndpoint`.
+ * a PUBLIC activate+status controller is mounted only when
+ * `enableActivationEndpoint`.
  */
 let LicenseClientModule = LicenseClientModule_1 = class LicenseClientModule {
     static forRoot(options) {

@@ -134,7 +134,9 @@ level `verifyLicenseToken(token, publicKey)`.
 
 When the license is invalid, the middleware **renders its own key-entry form**
 (no page in your app source) and, on a valid submit, stores the key in an
-httpOnly cookie — the app then unlocks. Your `middleware.ts` only calls the
+httpOnly cookie **and** syncs it to the backend. After that sync, **any**
+browser unlocks via `GET /license/status` — one operator activation covers the
+whole install (no per-machine re-entry). Your `middleware.ts` only calls the
 factory:
 
 ```ts
@@ -157,15 +159,17 @@ export const config = { matcher: ['/((?!api|_next|_vercel|static|favicon.ico|.*\
 ```
 
 Key resolution order: activation **cookie** → `licenseKey` option →
-`NEXT_PUBLIC_LICENSE_KEY`. The submitted key is verified (signature) before
-acceptance, so a bogus key can't unlock.
+`NEXT_PUBLIC_LICENSE_KEY` → (if still empty) **backend already licensed** via
+`GET …/license/status` derived from `backendActivateUrl`. The submitted key is
+verified (signature) before acceptance, so a bogus key can't unlock.
 
-**Backend sync** — mount the public activation endpoint so the entered key also
-reaches the real gate:
+**Backend sync** — mount the public activation endpoints so the entered key also
+reaches the real gate, and so other browsers unlock without a cookie:
 
 ```ts
 LicenseClientModule.forRoot({ ...cfg.licenseClient, enableActivationEndpoint: true })
 // exposes PUBLIC  POST /v1/license/activate  { licenseKey }  → { valid, fresh, reason }
+//          PUBLIC  GET  /v1/license/status                   → { valid, fresh, reason }
 // a valid key is persisted (keyStorePath, default .license/active-key) and adopted.
 ```
 

@@ -1,12 +1,30 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+} from '@nestjs/common';
 import { LicenseClientService } from './license-client.service';
 
+export type PublicLicenseSnapshot = {
+  valid: boolean;
+  fresh: boolean;
+  reason: string | null;
+};
+
 /**
- * PUBLIC activation endpoint (`POST /license/activate`). Accepts a license key,
- * verifies it against the authority, and — only if valid — persists it as the
- * active key and adopts it (no restart needed). Public because the key itself is
- * the credential; it cannot grant validity a forged key wouldn't already have.
- * Mounted only when `enableActivationEndpoint` is set. Rate-limit it upstream.
+ * PUBLIC license endpoints for self-served installs. Mounted only when
+ * `enableActivationEndpoint` is set. Rate-limit them upstream.
+ *
+ * - `POST /license/activate` — accept a key, verify online, persist if valid.
+ * - `GET  /license/status`  — whether this install is already licensed (no key
+ *   leaked). Front-end gates use this so one activation unlocks every browser.
+ *
+ * Public because the key itself is the credential on activate, and status only
+ * exposes a boolean that the cosmetic FE gate already needs. Real enforcement
+ * stays on the backend boot gate / `LicenseClientService`.
  *
  * Uses `@Body('licenseKey')` (not a DTO class) so it needs no class-validator
  * dependency and isn't stripped by a host `whitelist` ValidationPipe.
@@ -15,11 +33,18 @@ import { LicenseClientService } from './license-client.service';
 export class LicenseActivateController {
   constructor(private readonly licenses: LicenseClientService) {}
 
+  @Get('status')
+  @HttpCode(HttpStatus.OK)
+  status(): PublicLicenseSnapshot {
+    const state = this.licenses.getState();
+    return { valid: state.valid, fresh: state.fresh, reason: state.reason };
+  }
+
   @Post('activate')
   @HttpCode(HttpStatus.OK)
   async activate(
     @Body('licenseKey') licenseKey: string,
-  ): Promise<{ valid: boolean; fresh: boolean; reason: string | null }> {
+  ): Promise<PublicLicenseSnapshot> {
     const state = await this.licenses.activate(licenseKey ?? '');
     return { valid: state.valid, fresh: state.fresh, reason: state.reason };
   }

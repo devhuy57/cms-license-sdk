@@ -3,7 +3,7 @@ import { checkLicense } from '../edge';
 import { renderActivationForm } from './form';
 
 export interface LicenseMiddlewareOptions {
-  /** License server base URL, e.g. https://api-cms.huy.lat */
+  /** License server base URL, e.g. https://api-cms.example.com */
   serverUrl: string;
   /** Build-time fallback key; overridden by the activation cookie at runtime. */
   licenseKey?: string;
@@ -13,7 +13,11 @@ export interface LicenseMiddlewareOptions {
   publicKey?: string;
   /** Base path the middleware owns for activation. Default `/__license`. */
   activationPath?: string;
-  /** If set, the accepted key is POSTed here so the backend can sync + enforce. */
+  /**
+   * If set, an accepted key is POSTed here so the backend can sync + enforce.
+   * Also used to derive `GET …/status` so browsers without a cookie unlock
+   * once any operator has activated the install.
+   */
   backendActivateUrl?: string;
   /** Cookie that stores the runtime-entered key. Default `__license_key`. */
   cookieName?: string;
@@ -42,11 +46,42 @@ function htmlResponse(body: string, status = 200): NextResponse {
   });
 }
 
+/** `…/license/activate` → `…/license/status`. Exported for unit tests. */
+export function backendStatusUrlFromActivateUrl(activateUrl: string): string {
+  return activateUrl.replace(/\/activate\/?$/, '/status');
+}
+
+/**
+ * Best-effort: is the product backend already licensed? Used so one activation
+ * unlocks every browser (no per-machine cookie required). Fail-closed on any
+ * network/parse error — the activation form still works as a fallback.
+ */
+export async function isBackendLicenseValid(
+  backendActivateUrl: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
+  const statusUrl = backendStatusUrlFromActivateUrl(backendActivateUrl);
+  if (statusUrl === backendActivateUrl) return false;
+  try {
+    const res = await fetchImpl(statusUrl, {
+      method: 'GET',
+      headers: { accept: 'application/json' },
+      cache: 'no-store',
+    });
+    if (!res.ok) return false;
+    const body = (await res.json()) as { valid?: unknown };
+    return body?.valid === true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * License gate + self-served activation for Next.js apps. When the license is
  * invalid the middleware RENDERS its own activation form (no page needed in the
- * app source); submitting a valid key sets an httpOnly cookie (and optionally
- * syncs it to the backend), after which the app unlocks. Everything lives in the
+ * app source); submitting a valid key sets an httpOnly cookie and syncs it to
+ * the backend. After that sync, **any** browser unlocks via `GET /license/status`
+ * — one operator activation covers the whole install. Everything lives in the
  * SDK — the app's `middleware.ts` only calls this factory.
  */
 export function createLicenseMiddleware(options: LicenseMiddlewareOptions) {
@@ -94,7 +129,8 @@ export function createLicenseMiddleware(options: LicenseMiddlewareOptions) {
         );
       }
 
-      // Best-effort backend sync so the real enforcement point picks it up too.
+      // Best-effort backend sync so the real enforcement point picks it up too
+      // — and so other browsers unlock via GET /license/status without a cookie.
       if (options.backendActivateUrl) {
         try {
           await fetch(options.backendActivateUrl, {
@@ -134,7 +170,14 @@ export function createLicenseMiddleware(options: LicenseMiddlewareOptions) {
         : undefined) ||
       '';
 
+    // No local key: unlock if the backend was already activated by anyone.
     if (!licenseKey) {
+      if (
+        options.backendActivateUrl &&
+        (await isBackendLicenseValid(options.backendActivateUrl))
+      ) {
+        return null;
+      }
       return htmlResponse(form({}));
     }
 
@@ -146,6 +189,13 @@ export function createLicenseMiddleware(options: LicenseMiddlewareOptions) {
     });
 
     if (!result.valid) {
+      // Stale/bogus cookie — still unlock if the install itself is licensed.
+      if (
+        options.backendActivateUrl &&
+        (await isBackendLicenseValid(options.backendActivateUrl))
+      ) {
+        return null;
+      }
       return htmlResponse(
         form({
           message: `License ${result.status}${

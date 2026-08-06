@@ -1,5 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.backendStatusUrlFromActivateUrl = backendStatusUrlFromActivateUrl;
+exports.isBackendLicenseValid = isBackendLicenseValid;
 exports.createLicenseMiddleware = createLicenseMiddleware;
 const server_1 = require("next/server");
 const edge_1 = require("../edge");
@@ -20,11 +22,40 @@ function htmlResponse(body, status = 200) {
         headers: { 'content-type': 'text/html; charset=utf-8' },
     });
 }
+/** `…/license/activate` → `…/license/status`. Exported for unit tests. */
+function backendStatusUrlFromActivateUrl(activateUrl) {
+    return activateUrl.replace(/\/activate\/?$/, '/status');
+}
+/**
+ * Best-effort: is the product backend already licensed? Used so one activation
+ * unlocks every browser (no per-machine cookie required). Fail-closed on any
+ * network/parse error — the activation form still works as a fallback.
+ */
+async function isBackendLicenseValid(backendActivateUrl, fetchImpl = fetch) {
+    const statusUrl = backendStatusUrlFromActivateUrl(backendActivateUrl);
+    if (statusUrl === backendActivateUrl)
+        return false;
+    try {
+        const res = await fetchImpl(statusUrl, {
+            method: 'GET',
+            headers: { accept: 'application/json' },
+            cache: 'no-store',
+        });
+        if (!res.ok)
+            return false;
+        const body = (await res.json());
+        return body?.valid === true;
+    }
+    catch {
+        return false;
+    }
+}
 /**
  * License gate + self-served activation for Next.js apps. When the license is
  * invalid the middleware RENDERS its own activation form (no page needed in the
- * app source); submitting a valid key sets an httpOnly cookie (and optionally
- * syncs it to the backend), after which the app unlocks. Everything lives in the
+ * app source); submitting a valid key sets an httpOnly cookie and syncs it to
+ * the backend. After that sync, **any** browser unlocks via `GET /license/status`
+ * — one operator activation covers the whole install. Everything lives in the
  * SDK — the app's `middleware.ts` only calls this factory.
  */
 function createLicenseMiddleware(options) {
@@ -61,7 +92,8 @@ function createLicenseMiddleware(options) {
                     value: submitted,
                 }));
             }
-            // Best-effort backend sync so the real enforcement point picks it up too.
+            // Best-effort backend sync so the real enforcement point picks it up too
+            // — and so other browsers unlock via GET /license/status without a cookie.
             if (options.backendActivateUrl) {
                 try {
                     await fetch(options.backendActivateUrl, {
@@ -97,7 +129,12 @@ function createLicenseMiddleware(options) {
                 ? process.env.NEXT_PUBLIC_LICENSE_KEY
                 : undefined) ||
             '';
+        // No local key: unlock if the backend was already activated by anyone.
         if (!licenseKey) {
+            if (options.backendActivateUrl &&
+                (await isBackendLicenseValid(options.backendActivateUrl))) {
+                return null;
+            }
             return htmlResponse(form({}));
         }
         const result = await (0, edge_1.checkLicense)({
@@ -107,6 +144,11 @@ function createLicenseMiddleware(options) {
             publicKey: options.publicKey,
         });
         if (!result.valid) {
+            // Stale/bogus cookie — still unlock if the install itself is licensed.
+            if (options.backendActivateUrl &&
+                (await isBackendLicenseValid(options.backendActivateUrl))) {
+                return null;
+            }
             return htmlResponse(form({
                 message: `License ${result.status}${result.reason ? ` (${result.reason})` : ''}. Enter a valid license key to continue.`,
             }));

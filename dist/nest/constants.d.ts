@@ -11,8 +11,9 @@ export interface LicenseClientModuleOptions {
     requestTimeoutMs: number;
     /** File that persists a runtime-activated key (overrides `licenseKey`). */
     keyStorePath?: string;
-    /** Mount a PUBLIC `POST /license/activate` so a new key can be applied at
-     *  runtime (the key is verified before it is accepted). Default false. */
+    /** Mount PUBLIC `POST /license/activate` + `GET /license/status` so a new
+     *  key can be applied at runtime and front-end gates can unlock every
+     *  browser once the backend is licensed. Default false. */
     enableActivationEndpoint?: boolean;
 }
 export declare const LICENSE_CLIENT_OPTIONS: unique symbol;
