@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.backendStatusUrlFromActivateUrl = backendStatusUrlFromActivateUrl;
+exports.licenseValidFromStatusBody = licenseValidFromStatusBody;
 exports.isBackendLicenseValid = isBackendLicenseValid;
 exports.createLicenseMiddleware = createLicenseMiddleware;
 const server_1 = require("next/server");
@@ -27,6 +28,19 @@ function backendStatusUrlFromActivateUrl(activateUrl) {
     return activateUrl.replace(/\/activate\/?$/, '/status');
 }
 /**
+ * Host APIs often wrap payloads (`{ success, data: { valid } }`). The public
+ * activate controller may also return `{ success: true, valid }` so a host
+ * interceptor that already-envelope-passthroughs does not nest it. Accept both.
+ */
+function licenseValidFromStatusBody(body) {
+    if (!body || typeof body !== 'object')
+        return false;
+    const root = body;
+    if (root.valid === true)
+        return true;
+    return root.data?.valid === true;
+}
+/**
  * Best-effort: is the product backend already licensed? Used so one activation
  * unlocks every browser (no per-machine cookie required). Fail-closed on any
  * network/parse error — the activation form still works as a fallback.
@@ -43,8 +57,7 @@ async function isBackendLicenseValid(backendActivateUrl, fetchImpl = fetch) {
         });
         if (!res.ok)
             return false;
-        const body = (await res.json());
-        return body?.valid === true;
+        return licenseValidFromStatusBody(await res.json());
     }
     catch {
         return false;

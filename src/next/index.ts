@@ -52,6 +52,18 @@ export function backendStatusUrlFromActivateUrl(activateUrl: string): string {
 }
 
 /**
+ * Host APIs often wrap payloads (`{ success, data: { valid } }`). The public
+ * activate controller may also return `{ success: true, valid }` so a host
+ * interceptor that already-envelope-passthroughs does not nest it. Accept both.
+ */
+export function licenseValidFromStatusBody(body: unknown): boolean {
+  if (!body || typeof body !== 'object') return false;
+  const root = body as { valid?: unknown; data?: { valid?: unknown } };
+  if (root.valid === true) return true;
+  return root.data?.valid === true;
+}
+
+/**
  * Best-effort: is the product backend already licensed? Used so one activation
  * unlocks every browser (no per-machine cookie required). Fail-closed on any
  * network/parse error — the activation form still works as a fallback.
@@ -69,8 +81,7 @@ export async function isBackendLicenseValid(
       cache: 'no-store',
     });
     if (!res.ok) return false;
-    const body = (await res.json()) as { valid?: unknown };
-    return body?.valid === true;
+    return licenseValidFromStatusBody(await res.json());
   } catch {
     return false;
   }

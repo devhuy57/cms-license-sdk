@@ -36,11 +36,21 @@ let LicenseActivateController = class LicenseActivateController {
     }
     status() {
         const state = this.licenses.getState();
-        return { valid: state.valid, fresh: state.fresh, reason: state.reason };
+        return {
+            success: true,
+            valid: state.valid,
+            fresh: state.fresh,
+            reason: state.reason,
+        };
     }
     async activate(licenseKey) {
         const state = await this.licenses.activate(licenseKey ?? '');
-        return { valid: state.valid, fresh: state.fresh, reason: state.reason };
+        return {
+            success: true,
+            valid: state.valid,
+            fresh: state.fresh,
+            reason: state.reason,
+        };
     }
 };
 exports.LicenseActivateController = LicenseActivateController;

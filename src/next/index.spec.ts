@@ -1,6 +1,7 @@
 import {
   backendStatusUrlFromActivateUrl,
   isBackendLicenseValid,
+  licenseValidFromStatusBody,
 } from './index';
 
 describe('backendStatusUrlFromActivateUrl', () => {
@@ -75,5 +76,48 @@ describe('isBackendLicenseValid', () => {
       ),
     ).resolves.toBe(false);
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('unwraps a host success envelope { data: { valid: true } }', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: { valid: true, fresh: true, reason: null },
+      }),
+    });
+    await expect(
+      isBackendLicenseValid(
+        'https://api.example/v1/license/activate',
+        fetchImpl as unknown as typeof fetch,
+      ),
+    ).resolves.toBe(true);
+  });
+
+  it('accepts already-enveloped { success: true, valid: true }', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, valid: true, fresh: true, reason: null }),
+    });
+    await expect(
+      isBackendLicenseValid(
+        'https://api.example/v1/license/activate',
+        fetchImpl as unknown as typeof fetch,
+      ),
+    ).resolves.toBe(true);
+  });
+});
+
+describe('licenseValidFromStatusBody', () => {
+  it('reads top-level valid', () => {
+    expect(licenseValidFromStatusBody({ valid: true })).toBe(true);
+    expect(licenseValidFromStatusBody({ valid: false })).toBe(false);
+  });
+
+  it('reads nested data.valid', () => {
+    expect(licenseValidFromStatusBody({ data: { valid: true } })).toBe(true);
+    expect(licenseValidFromStatusBody({ success: true, data: { valid: false } })).toBe(
+      false,
+    );
   });
 });

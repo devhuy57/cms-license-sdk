@@ -9,6 +9,12 @@ import {
 import { LicenseClientService } from './license-client.service';
 
 export type PublicLicenseSnapshot = {
+  /**
+   * Marks this payload as already-enveloped so a host `ResponseInterceptor`
+   * that pass-throughs `{ success: boolean }` does not wrap `valid` under
+   * `data` (which would hide it from the Next.js gate).
+   */
+  success: true;
   valid: boolean;
   fresh: boolean;
   reason: string | null;
@@ -37,7 +43,12 @@ export class LicenseActivateController {
   @HttpCode(HttpStatus.OK)
   status(): PublicLicenseSnapshot {
     const state = this.licenses.getState();
-    return { valid: state.valid, fresh: state.fresh, reason: state.reason };
+    return {
+      success: true,
+      valid: state.valid,
+      fresh: state.fresh,
+      reason: state.reason,
+    };
   }
 
   @Post('activate')
@@ -46,6 +57,11 @@ export class LicenseActivateController {
     @Body('licenseKey') licenseKey: string,
   ): Promise<PublicLicenseSnapshot> {
     const state = await this.licenses.activate(licenseKey ?? '');
-    return { valid: state.valid, fresh: state.fresh, reason: state.reason };
+    return {
+      success: true,
+      valid: state.valid,
+      fresh: state.fresh,
+      reason: state.reason,
+    };
   }
 }

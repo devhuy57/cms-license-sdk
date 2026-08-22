@@ -3,6 +3,12 @@ import { LicenseAuthorityPort, TokenCachePort, TokenVerifierPort } from './ports
 import { KeyStorePort } from './key-store';
 import { LicenseClientState } from './state';
 /**
+ * Clients configure a stable product slug (`nguonvia`); the license server
+ * historically signed the catalog UUID. Treat that pairing as a match so a
+ * valid key still activates while older tokens are in circulation.
+ */
+export declare function productIdMatches(configured: string, claimed: string): boolean;
+/**
  * Owns live license state. `refresh()` checks the authority online (verify sig →
  * validate claims → cache); on a network failure it falls back to the cached
  * token while within its grace window. Read helpers feed the boot gate, the

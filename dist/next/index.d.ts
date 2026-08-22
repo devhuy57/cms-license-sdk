@@ -25,6 +25,12 @@ export interface LicenseMiddlewareOptions {
 /** `…/license/activate` → `…/license/status`. Exported for unit tests. */
 export declare function backendStatusUrlFromActivateUrl(activateUrl: string): string;
 /**
+ * Host APIs often wrap payloads (`{ success, data: { valid } }`). The public
+ * activate controller may also return `{ success: true, valid }` so a host
+ * interceptor that already-envelope-passthroughs does not nest it. Accept both.
+ */
+export declare function licenseValidFromStatusBody(body: unknown): boolean;
+/**
  * Best-effort: is the product backend already licensed? Used so one activation
  * unlocks every browser (no per-machine cookie required). Fail-closed on any
  * network/parse error — the activation form still works as a fallback.

@@ -136,7 +136,9 @@ When the license is invalid, the middleware **renders its own key-entry form**
 (no page in your app source) and, on a valid submit, stores the key in an
 httpOnly cookie **and** syncs it to the backend. After that sync, **any**
 browser unlocks via `GET /license/status` — one operator activation covers the
-whole install (no per-machine re-entry). Your `middleware.ts` only calls the
+whole install (no per-machine re-entry). The status helper unwraps a host
+success envelope (`{ data: { valid } }`) and also accepts `{ success: true, valid }`
+so Nest interceptors do not hide the flag. Your `middleware.ts` only calls the
 factory:
 
 ```ts
@@ -168,8 +170,8 @@ reaches the real gate, and so other browsers unlock without a cookie:
 
 ```ts
 LicenseClientModule.forRoot({ ...cfg.licenseClient, enableActivationEndpoint: true })
-// exposes PUBLIC  POST /v1/license/activate  { licenseKey }  → { valid, fresh, reason }
-//          PUBLIC  GET  /v1/license/status                   → { valid, fresh, reason }
+// exposes PUBLIC  POST /v1/license/activate  { licenseKey }  → { success: true, valid, fresh, reason }
+//          PUBLIC  GET  /v1/license/status                   → { success: true, valid, fresh, reason }
 // a valid key is persisted (keyStorePath, default .license/active-key) and adopted.
 ```
 

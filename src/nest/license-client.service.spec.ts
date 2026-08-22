@@ -1,7 +1,7 @@
 import { LicenseTokenClaims } from '../core';
 import { LicenseClientModuleOptions } from './constants';
 import { KeyStorePort } from './key-store';
-import { LicenseClientService } from './license-client.service';
+import { LicenseClientService, productIdMatches } from './license-client.service';
 import {
   LicenseAuthorityPort,
   LicenseAuthorityUnreachableError,
@@ -123,6 +123,20 @@ describe('license-sdk/nest LicenseClientService', () => {
     expect((await service.refresh()).reason).toBe('product_mismatch');
   });
 
+  it('accepts a catalog-UUID claim against the configured product slug', async () => {
+    const { service } = build({
+      authority: okOnline,
+      verifier: {
+        verify: jest.fn().mockReturnValue(
+          claims({ productId: 'a1b2c3d4-e5f6-47a8-8bcd-1234567890ab' }),
+        ),
+      },
+    });
+    const state = await service.refresh();
+    expect(state.valid).toBe(true);
+    expect(state.reason).toBeNull();
+  });
+
   it('server_invalid when authority returns no token', async () => {
     const { service } = build({
       authority: {
@@ -217,5 +231,21 @@ describe('license-sdk/nest LicenseClientService', () => {
     const state = await service.activate('BAD-KEY');
     expect(state.valid).toBe(false);
     expect(keyStore.write).not.toHaveBeenCalled();
+  });
+});
+
+describe('productIdMatches', () => {
+  it('matches equal slugs', () => {
+    expect(productIdMatches('nguonvia', 'nguonvia')).toBe(true);
+  });
+
+  it('treats a catalog UUID claim as matching a configured slug', () => {
+    expect(
+      productIdMatches('nguonvia', 'a1b2c3d4-e5f6-47a8-8bcd-1234567890ab'),
+    ).toBe(true);
+  });
+
+  it('rejects a different slug', () => {
+    expect(productIdMatches('nguonvia', 'shop-key')).toBe(false);
   });
 });

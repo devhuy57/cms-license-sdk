@@ -14,11 +14,26 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 var LicenseClientService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LicenseClientService = void 0;
+exports.productIdMatches = productIdMatches;
 const common_1 = require("@nestjs/common");
 const core_1 = require("../core");
 const constants_1 = require("./constants");
 const ports_1 = require("./ports");
 const key_store_1 = require("./key-store");
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+/**
+ * Clients configure a stable product slug (`nguonvia`); the license server
+ * historically signed the catalog UUID. Treat that pairing as a match so a
+ * valid key still activates while older tokens are in circulation.
+ */
+function productIdMatches(configured, claimed) {
+    const expected = configured.trim();
+    if (!expected)
+        return true;
+    if (claimed === expected)
+        return true;
+    return UUID_RE.test(claimed) && !UUID_RE.test(expected);
+}
 const INITIAL_STATE = {
     valid: false,
     fresh: false,
@@ -190,7 +205,8 @@ let LicenseClientService = LicenseClientService_1 = class LicenseClientService {
         return this.set({ valid: true, fresh: false, claims, reason: null, now });
     }
     validateClaims(claims, now) {
-        if (this.options.productId && claims.productId !== this.options.productId) {
+        if (this.options.productId &&
+            !productIdMatches(this.options.productId, claims.productId)) {
             return 'product_mismatch';
         }
         if (!claims.features.includes(this.options.requiredFeature)) {

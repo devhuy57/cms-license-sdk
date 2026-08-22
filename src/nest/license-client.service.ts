@@ -13,6 +13,24 @@ import {
 import { KEY_STORE, KeyStorePort } from './key-store';
 import { LicenseClientReason, LicenseClientState } from './state';
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * Clients configure a stable product slug (`nguonvia`); the license server
+ * historically signed the catalog UUID. Treat that pairing as a match so a
+ * valid key still activates while older tokens are in circulation.
+ */
+export function productIdMatches(
+  configured: string,
+  claimed: string,
+): boolean {
+  const expected = configured.trim();
+  if (!expected) return true;
+  if (claimed === expected) return true;
+  return UUID_RE.test(claimed) && !UUID_RE.test(expected);
+}
+
 const INITIAL_STATE: LicenseClientState = {
   valid: false,
   fresh: false,
@@ -218,7 +236,10 @@ export class LicenseClientService {
     claims: LicenseTokenClaims,
     now: Date,
   ): LicenseClientReason | null {
-    if (this.options.productId && claims.productId !== this.options.productId) {
+    if (
+      this.options.productId &&
+      !productIdMatches(this.options.productId, claims.productId)
+    ) {
       return 'product_mismatch';
     }
     if (!claims.features.includes(this.options.requiredFeature)) {
