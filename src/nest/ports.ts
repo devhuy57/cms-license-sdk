@@ -33,5 +33,7 @@ export class LicenseAuthorityUnreachableError extends Error {
 export interface TokenCachePort {
   read(): Promise<string | null>;
   write(token: string): Promise<void>;
+  /** Drop the cached token after the authority explicitly rejects the key. */
+  clear(): Promise<void>;
 }
 export const TOKEN_CACHE = Symbol('LICENSE_CLIENT_TOKEN_CACHE');

@@ -62,6 +62,7 @@ function build(parts: {
   const cache = {
     read: jest.fn().mockResolvedValue(null),
     write: jest.fn().mockResolvedValue(undefined),
+    clear: jest.fn().mockResolvedValue(undefined),
     ...parts.cache,
   } as unknown as TokenCachePort;
   const keyStore = {
@@ -77,6 +78,7 @@ function build(parts: {
       cache,
       keyStore,
     ),
+    authority,
     cache,
     keyStore,
   };
@@ -140,7 +142,7 @@ describe('license-sdk/nest LicenseClientService', () => {
   });
 
   it('server_invalid when authority returns no token', async () => {
-    const { service } = build({
+    const { service, cache } = build({
       authority: {
         verify: jest.fn().mockResolvedValue({
           valid: false,
@@ -151,6 +153,33 @@ describe('license-sdk/nest LicenseClientService', () => {
       },
     });
     expect((await service.refresh()).reason).toBe('server_invalid');
+    expect(cache.clear).toHaveBeenCalled();
+  });
+
+  it('license_inactive when the token status is not active', async () => {
+    const { service, cache } = build({
+      authority: okOnline,
+      verifier: {
+        verify: jest.fn().mockReturnValue(claims({ status: 'suspended' })),
+      },
+    });
+    const state = await service.refresh();
+    expect(state.valid).toBe(false);
+    expect(state.reason).toBe('license_inactive');
+    expect(cache.clear).toHaveBeenCalled();
+  });
+
+  it('refresh({ maxAgeMs }) reuses a fresh result without calling the authority', async () => {
+    const verify = jest
+      .fn()
+      .mockResolvedValue({ valid: true, reason: null, status: 'active', token: 'tok' });
+    const { service } = build({
+      authority: { verify },
+      verifier: { verify: jest.fn().mockReturnValue(claims()) },
+    });
+    await service.refresh();
+    await service.refresh({ maxAgeMs: 60_000 });
+    expect(verify).toHaveBeenCalledTimes(1);
   });
 
   it('offline: valid within grace from cache', async () => {

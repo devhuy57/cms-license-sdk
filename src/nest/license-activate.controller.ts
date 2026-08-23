@@ -25,8 +25,9 @@ export type PublicLicenseSnapshot = {
  * `enableActivationEndpoint` is set. Rate-limit them upstream.
  *
  * - `POST /license/activate` — accept a key, verify online, persist if valid.
- * - `GET  /license/status`  — whether this install is already licensed (no key
- *   leaked). Front-end gates use this so one activation unlocks every browser.
+ * - `GET  /license/status`  — re-checks the authority (short TTL) so a
+ *   revoked/suspended key locks the front-end gate without waiting for the
+ *   hourly heartbeat. No key is leaked.
  *
  * Public because the key itself is the credential on activate, and status only
  * exposes a boolean that the cosmetic FE gate already needs. Real enforcement
@@ -35,14 +36,19 @@ export type PublicLicenseSnapshot = {
  * Uses `@Body('licenseKey')` (not a DTO class) so it needs no class-validator
  * dependency and isn't stripped by a host `whitelist` ValidationPipe.
  */
+/** Collapse duplicate admin navigations; still picks up a CMS revoke quickly. */
+const STATUS_RECHECK_MAX_AGE_MS = 10_000;
+
 @Controller('license')
 export class LicenseActivateController {
   constructor(private readonly licenses: LicenseClientService) {}
 
   @Get('status')
   @HttpCode(HttpStatus.OK)
-  status(): PublicLicenseSnapshot {
-    const state = this.licenses.getState();
+  async status(): Promise<PublicLicenseSnapshot> {
+    const state = await this.licenses.refresh({
+      maxAgeMs: STATUS_RECHECK_MAX_AGE_MS,
+    });
     return {
       success: true,
       valid: state.valid,

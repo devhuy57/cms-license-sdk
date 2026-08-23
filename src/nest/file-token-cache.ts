@@ -30,4 +30,12 @@ export class FileTokenCache implements TokenCachePort {
     await fs.mkdir(dirname(this.path), { recursive: true });
     await fs.writeFile(this.path, token, { mode: 0o600 });
   }
+
+  async clear(): Promise<void> {
+    try {
+      await fs.unlink(this.path);
+    } catch {
+      // Missing file is already cleared.
+    }
+  }
 }

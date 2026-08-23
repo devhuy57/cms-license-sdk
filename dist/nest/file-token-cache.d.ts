@@ -9,4 +9,5 @@ export declare class FileTokenCache implements TokenCachePort {
     constructor(cachePath: string);
     read(): Promise<string | null>;
     write(token: string): Promise<void>;
+    clear(): Promise<void>;
 }

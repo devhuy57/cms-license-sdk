@@ -22,6 +22,7 @@ export declare class LicenseClientService {
     private readonly keyStore;
     private readonly logger;
     private state;
+    private inflight;
     constructor(options: LicenseClientModuleOptions, authority: LicenseAuthorityPort, verifier: TokenVerifierPort, cache: TokenCachePort, keyStore: KeyStorePort);
     /** The active key: a runtime-activated key (if any) overrides the config. */
     private activeKey;
@@ -36,7 +37,15 @@ export declare class LicenseClientService {
     hasFeature(feature: string): boolean;
     /** Per-license runtime secret (Phase B). Null unless currently valid. */
     getRuntimeSecret(): string | null;
-    refresh(): Promise<LicenseClientState>;
+    /**
+     * Re-verify with the authority. Concurrent callers share one in-flight check.
+     * Pass `maxAgeMs` to reuse the last result when it is still fresh (status
+     * endpoint uses this so every admin page does not hammer the CMS).
+     */
+    refresh(opts?: {
+        maxAgeMs?: number;
+    }): Promise<LicenseClientState>;
+    private doRefresh;
     /**
      * Online verification for `licenseKey`: authority → signature → claims → cache.
      * Throws {@link LicenseAuthorityUnreachableError} when the authority can't be

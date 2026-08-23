@@ -28,5 +28,13 @@ class FileTokenCache {
         await node_fs_1.promises.mkdir((0, node_path_1.dirname)(this.path), { recursive: true });
         await node_fs_1.promises.writeFile(this.path, token, { mode: 0o600 });
     }
+    async clear() {
+        try {
+            await node_fs_1.promises.unlink(this.path);
+        }
+        catch {
+            // Missing file is already cleared.
+        }
+    }
 }
 exports.FileTokenCache = FileTokenCache;

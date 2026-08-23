@@ -6,6 +6,7 @@ export type LicenseClientReason =
   | 'product_mismatch'
   | 'feature_missing'
   | 'license_expired'
+  | 'license_inactive'
   | 'server_invalid'
   | 'offline_no_cache'
   | 'offline_grace_expired';

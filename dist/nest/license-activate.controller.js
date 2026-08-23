@@ -20,8 +20,9 @@ const license_client_service_1 = require("./license-client.service");
  * `enableActivationEndpoint` is set. Rate-limit them upstream.
  *
  * - `POST /license/activate` — accept a key, verify online, persist if valid.
- * - `GET  /license/status`  — whether this install is already licensed (no key
- *   leaked). Front-end gates use this so one activation unlocks every browser.
+ * - `GET  /license/status`  — re-checks the authority (short TTL) so a
+ *   revoked/suspended key locks the front-end gate without waiting for the
+ *   hourly heartbeat. No key is leaked.
  *
  * Public because the key itself is the credential on activate, and status only
  * exposes a boolean that the cosmetic FE gate already needs. Real enforcement
@@ -30,12 +31,16 @@ const license_client_service_1 = require("./license-client.service");
  * Uses `@Body('licenseKey')` (not a DTO class) so it needs no class-validator
  * dependency and isn't stripped by a host `whitelist` ValidationPipe.
  */
+/** Collapse duplicate admin navigations; still picks up a CMS revoke quickly. */
+const STATUS_RECHECK_MAX_AGE_MS = 10_000;
 let LicenseActivateController = class LicenseActivateController {
     constructor(licenses) {
         this.licenses = licenses;
     }
-    status() {
-        const state = this.licenses.getState();
+    async status() {
+        const state = await this.licenses.refresh({
+            maxAgeMs: STATUS_RECHECK_MAX_AGE_MS,
+        });
         return {
             success: true,
             valid: state.valid,
@@ -59,7 +64,7 @@ __decorate([
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Object)
+    __metadata("design:returntype", Promise)
 ], LicenseActivateController.prototype, "status", null);
 __decorate([
     (0, common_1.Post)('activate'),

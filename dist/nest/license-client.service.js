@@ -56,6 +56,7 @@ let LicenseClientService = LicenseClientService_1 = class LicenseClientService {
         this.keyStore = keyStore;
         this.logger = new common_1.Logger(LicenseClientService_1.name);
         this.state = INITIAL_STATE;
+        this.inflight = null;
     }
     /** The active key: a runtime-activated key (if any) overrides the config. */
     async activeKey() {
@@ -111,7 +112,27 @@ let LicenseClientService = LicenseClientService_1 = class LicenseClientService {
     getRuntimeSecret() {
         return this.state.valid ? (this.state.claims?.secret ?? null) : null;
     }
-    async refresh() {
+    /**
+     * Re-verify with the authority. Concurrent callers share one in-flight check.
+     * Pass `maxAgeMs` to reuse the last result when it is still fresh (status
+     * endpoint uses this so every admin page does not hammer the CMS).
+     */
+    async refresh(opts) {
+        const maxAgeMs = opts?.maxAgeMs;
+        if (maxAgeMs != null &&
+            maxAgeMs > 0 &&
+            this.state.lastCheckedAt &&
+            Date.now() - Date.parse(this.state.lastCheckedAt) < maxAgeMs) {
+            return this.state;
+        }
+        if (this.inflight)
+            return this.inflight;
+        this.inflight = this.doRefresh().finally(() => {
+            this.inflight = null;
+        });
+        return this.inflight;
+    }
+    async doRefresh() {
         const now = new Date();
         const nowSec = Math.floor(now.getTime() / 1000);
         const key = await this.activeKey();
@@ -141,6 +162,9 @@ let LicenseClientService = LicenseClientService_1 = class LicenseClientService {
             this.logger.warn(online.valid
                 ? 'License authority returned no signed token — cannot verify authenticity.'
                 : `License rejected by authority: ${online.reason ?? 'unknown'}`);
+            // Authority spoke: drop the last-good token so offline grace cannot
+            // keep a revoked/suspended/expired key alive.
+            await this.cache.clear();
             return this.set({ valid: false, fresh: true, claims: null, reason, now });
         }
         let claims;
@@ -149,6 +173,7 @@ let LicenseClientService = LicenseClientService_1 = class LicenseClientService {
         }
         catch (err) {
             this.logger.error(`License token signature invalid: ${err instanceof Error ? err.message : String(err)}`);
+            await this.cache.clear();
             return this.set({
                 valid: false,
                 fresh: true,
@@ -159,6 +184,7 @@ let LicenseClientService = LicenseClientService_1 = class LicenseClientService {
         }
         const invalid = this.validateClaims(claims, now);
         if (invalid) {
+            await this.cache.clear();
             return this.set({ valid: false, fresh: true, claims, reason: invalid, now });
         }
         await this.cache.write(online.token);
@@ -207,6 +233,9 @@ let LicenseClientService = LicenseClientService_1 = class LicenseClientService {
     validateClaims(claims, now) {
         // Token signature is authoritative. `productId` on the token is
         // informational — catalog UUID vs install slug must not block activate.
+        if (claims.status !== 'active') {
+            return 'license_inactive';
+        }
         if (!claims.features.includes(this.options.requiredFeature)) {
             return 'feature_missing';
         }
