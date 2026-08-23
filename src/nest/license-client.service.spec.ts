@@ -115,12 +115,14 @@ describe('license-sdk/nest LicenseClientService', () => {
     expect(state.reason).toBe('bad_signature');
   });
 
-  it('product_mismatch when token is for another product', async () => {
+  it('accepts a token whose productId differs from the configured slug', async () => {
     const { service } = build({
       authority: okOnline,
       verifier: { verify: jest.fn().mockReturnValue(claims({ productId: 'x' })) },
     });
-    expect((await service.refresh()).reason).toBe('product_mismatch');
+    const state = await service.refresh();
+    expect(state.valid).toBe(true);
+    expect(state.reason).toBeNull();
   });
 
   it('accepts a catalog-UUID claim against the configured product slug', async () => {

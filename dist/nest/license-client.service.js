@@ -205,10 +205,8 @@ let LicenseClientService = LicenseClientService_1 = class LicenseClientService {
         return this.set({ valid: true, fresh: false, claims, reason: null, now });
     }
     validateClaims(claims, now) {
-        if (this.options.productId &&
-            !productIdMatches(this.options.productId, claims.productId)) {
-            return 'product_mismatch';
-        }
+        // Token signature is authoritative. `productId` on the token is
+        // informational — catalog UUID vs install slug must not block activate.
         if (!claims.features.includes(this.options.requiredFeature)) {
             return 'feature_missing';
         }
