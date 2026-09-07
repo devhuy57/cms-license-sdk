@@ -5,7 +5,7 @@ Reusable Ed25519 license SDK, shared across products. Three entrypoints:
 | Import | Runtime | For |
 |---|---|---|
 | `@cmsnt/license-sdk/core` | Node (`node:crypto`) | License **server** (sign) + Node **backends** (verify) |
-| `@cmsnt/license-sdk/nest` | NestJS | **Backend** enforcement client (verify + boot gate + heartbeat) |
+| `@cmsnt/license-sdk/nest` | NestJS | **Backend** enforcement client (verify + boot gate + heartbeat), plus an update-availability client |
 | `@cmsnt/license-sdk/edge` | Web Crypto (`crypto.subtle`) | **Frontend** / edge (browser) verify — framework-agnostic |
 | `@cmsnt/license-sdk/next` | Next.js middleware | **Self-served activation** gate: renders its own key-entry form + cookie |
 
@@ -106,6 +106,52 @@ export class LicenseStatusController {
 
 `LicenseClientService` also exposes `isValid()`, `hasFeature(f)`, and
 `getRuntimeSecret()` (Phase B). Peer dep: `@nestjs/common` + `reflect-metadata`.
+
+### `nest` — update-availability client
+
+A separate, independent client: registers this process as an `Installation`
+with the CMS (reusing the license key, cached to disk so a restart doesn't
+re-register) and checks whether a newer release is published.
+
+```ts
+// api.module.ts
+import { UpdateClientModule } from '@cmsnt/license-sdk/nest';
+
+const updateClientImports = cfg.updateClient.enabled
+  ? [UpdateClientModule.forRoot(cfg.updateClient)]
+  : [];
+// ...imports: [...updateClientImports]
+```
+
+`forRoot(options)` — `{ authorityUrl, licenseKey, environment, hostname?, label?,
+currentVersion?, requestTimeoutMs, installationStorePath? }`. `refresh()` ensures
+the installation is registered (once, persisted to `installationStorePath`,
+default `.license/installation.json`) then asks the CMS for the latest release.
+A failed check (authority unreachable, or the stored token got revoked) keeps
+the previous good numbers rather than resetting them — this is informational,
+not an enforcement gate, so a transient blip should never flash "no update".
+
+**Status endpoint stays in your app**, same as the license one:
+
+```ts
+@Controller('update')
+export class UpdateStatusController {
+  constructor(private readonly updates: UpdateClientService) {}
+  @Get('status') @AdminAuth()
+  async status() {
+    const s = await this.updates.refresh({ maxAgeMs: 10_000 });
+    return { updateAvailable: s.updateAvailable, currentVersion: s.currentVersion,
+             latestVersion: s.latestVersion, reason: s.reason };
+  }
+}
+```
+
+> **Honest limits.** Independent of `LicenseClientModule` by design — if a
+> customer re-activates with a *different* license key at runtime, this
+> module's `licenseKey` option does not automatically follow it (the host app
+> would need to reconfigure/restart this module too). There is no download/
+> apply-the-update step here — that's a separate, not-yet-built concern; this
+> only answers "is a newer release available."
 
 ## `edge` — frontend / Next.js middleware
 

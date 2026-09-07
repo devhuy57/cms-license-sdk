@@ -15,3 +15,23 @@ export {
   type TokenCachePort,
   type TokenVerifierPort,
 } from './ports';
+
+export { UpdateClientModule } from './update-client.module';
+export { UpdateClientService } from './update-client.service';
+export {
+  UPDATE_CLIENT_OPTIONS,
+  DEFAULT_INSTALLATION_STORE_PATH,
+  type UpdateClientModuleOptions,
+} from './update-client-constants';
+export type { UpdateClientReason, UpdateClientState } from './update-client-state';
+export {
+  INSTALLATION_AUTHORITY,
+  INSTALLATION_TOKEN_STORE,
+  InstallationAuthorityUnreachableError,
+  InstallationUnauthorizedError,
+  type RegisterInstallationResult,
+  type AvailableUpdateResult,
+  type InstallationAuthorityPort,
+  type InstallationCredentials,
+  type InstallationTokenStorePort,
+} from './update-ports';

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LicenseAuthorityUnreachableError = exports.TOKEN_VERIFIER = exports.TOKEN_CACHE = exports.LICENSE_AUTHORITY = exports.LICENSE_CLIENT_OPTIONS = exports.LicenseClientService = exports.LicenseClientModule = void 0;
+exports.InstallationUnauthorizedError = exports.InstallationAuthorityUnreachableError = exports.INSTALLATION_TOKEN_STORE = exports.INSTALLATION_AUTHORITY = exports.DEFAULT_INSTALLATION_STORE_PATH = exports.UPDATE_CLIENT_OPTIONS = exports.UpdateClientService = exports.UpdateClientModule = exports.LicenseAuthorityUnreachableError = exports.TOKEN_VERIFIER = exports.TOKEN_CACHE = exports.LICENSE_AUTHORITY = exports.LICENSE_CLIENT_OPTIONS = exports.LicenseClientService = exports.LicenseClientModule = void 0;
 var license_client_module_1 = require("./license-client.module");
 Object.defineProperty(exports, "LicenseClientModule", { enumerable: true, get: function () { return license_client_module_1.LicenseClientModule; } });
 var license_client_service_1 = require("./license-client.service");
@@ -12,3 +12,15 @@ Object.defineProperty(exports, "LICENSE_AUTHORITY", { enumerable: true, get: fun
 Object.defineProperty(exports, "TOKEN_CACHE", { enumerable: true, get: function () { return ports_1.TOKEN_CACHE; } });
 Object.defineProperty(exports, "TOKEN_VERIFIER", { enumerable: true, get: function () { return ports_1.TOKEN_VERIFIER; } });
 Object.defineProperty(exports, "LicenseAuthorityUnreachableError", { enumerable: true, get: function () { return ports_1.LicenseAuthorityUnreachableError; } });
+var update_client_module_1 = require("./update-client.module");
+Object.defineProperty(exports, "UpdateClientModule", { enumerable: true, get: function () { return update_client_module_1.UpdateClientModule; } });
+var update_client_service_1 = require("./update-client.service");
+Object.defineProperty(exports, "UpdateClientService", { enumerable: true, get: function () { return update_client_service_1.UpdateClientService; } });
+var update_client_constants_1 = require("./update-client-constants");
+Object.defineProperty(exports, "UPDATE_CLIENT_OPTIONS", { enumerable: true, get: function () { return update_client_constants_1.UPDATE_CLIENT_OPTIONS; } });
+Object.defineProperty(exports, "DEFAULT_INSTALLATION_STORE_PATH", { enumerable: true, get: function () { return update_client_constants_1.DEFAULT_INSTALLATION_STORE_PATH; } });
+var update_ports_1 = require("./update-ports");
+Object.defineProperty(exports, "INSTALLATION_AUTHORITY", { enumerable: true, get: function () { return update_ports_1.INSTALLATION_AUTHORITY; } });
+Object.defineProperty(exports, "INSTALLATION_TOKEN_STORE", { enumerable: true, get: function () { return update_ports_1.INSTALLATION_TOKEN_STORE; } });
+Object.defineProperty(exports, "InstallationAuthorityUnreachableError", { enumerable: true, get: function () { return update_ports_1.InstallationAuthorityUnreachableError; } });
+Object.defineProperty(exports, "InstallationUnauthorizedError", { enumerable: true, get: function () { return update_ports_1.InstallationUnauthorizedError; } });

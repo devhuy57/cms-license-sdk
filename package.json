@@ -1,7 +1,7 @@
 {
   "name": "@cmsnt/license-sdk",
-  "version": "0.4.3",
-  "description": "Reusable Ed25519 license SDK: token core, NestJS enforcement client, edge (Web Crypto) verifier, and a self-served Next.js activation middleware.",
+  "version": "0.5.0",
+  "description": "Reusable Ed25519 license SDK: token core, NestJS enforcement client, an update-availability client, edge (Web Crypto) verifier, and a self-served Next.js activation middleware.",
   "license": "UNLICENSED",
   "private": false,
   "type": "commonjs",
