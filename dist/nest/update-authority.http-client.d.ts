@@ -1,23 +1,34 @@
-import { AvailableUpdateResult, InstallationAuthorityPort, RegisterInstallationResult } from './update-ports';
+import { AvailableUpdateResult, DownloadComponentOptions, DownloadedComponentFile, HeartbeatInput, InstallationAuthorityPort, RegisterInstallationResult, ReportStepInput, StartUpdateResult, UpdateStepName } from './update-ports';
 /**
- * Calls `POST {authorityUrl}/v1/installations/register` and
- * `GET {authorityUrl}/v1/installations/:id/updates` via native fetch with an
- * AbortController timeout. Network/timeout/non-2xx (other than 401) →
- * `InstallationAuthorityUnreachableError`; a 401 on `getUpdates` →
- * `InstallationUnauthorizedError`, which the caller uses to trigger
- * re-registration.
+ * The CMS's machine-facing installation API over native fetch.
+ *
+ * Every response goes through one `mapStatus`, so callers get a typed error
+ * they can act on rather than a single "unreachable" that hides whether the
+ * license lapsed, the token was revoked, or the network is down.
  */
 export declare class UpdateAuthorityHttpClient implements InstallationAuthorityPort {
     private readonly timeoutMs;
+    private readonly defaultIdleTimeoutMs;
     private readonly base;
-    constructor(authorityUrl: string, timeoutMs: number);
+    constructor(authorityUrl: string, timeoutMs: number, defaultIdleTimeoutMs?: number);
     register(input: {
         licenseKey: string;
         environment: string;
         hostname?: string;
         label?: string;
         currentVersion?: string;
+        metadata?: Record<string, unknown>;
     }): Promise<RegisterInstallationResult>;
     getUpdates(installationId: string, installationToken: string): Promise<AvailableUpdateResult>;
+    heartbeat(installationId: string, installationToken: string, input: HeartbeatInput): Promise<void>;
+    rotateToken(installationId: string, installationToken: string): Promise<RegisterInstallationResult>;
+    startUpdate(installationId: string, installationToken: string, releaseId: string): Promise<StartUpdateResult>;
+    reportStep(installationId: string, installationToken: string, jobId: string, input: ReportStepInput): Promise<{
+        status: UpdateStepName;
+    }>;
+    abandonJob(installationId: string, installationToken: string, jobId: string, reason: string): Promise<void>;
+    downloadComponent(installationId: string, installationToken: string, releaseId: string, component: string, options: DownloadComponentOptions): Promise<DownloadedComponentFile>;
+    /** One request → unwrapped `data`, with every status mapped to a typed error. */
+    private json;
     private fetchWithTimeout;
 }

@@ -107,14 +107,14 @@ export class LicenseStatusController {
 `LicenseClientService` also exposes `isValid()`, `hasFeature(f)`, and
 `getRuntimeSecret()` (Phase B). Peer dep: `@nestjs/common` + `reflect-metadata`.
 
-### `nest` — update-availability client
+### `nest` — update client
 
-A separate, independent client: registers this process as an `Installation`
-with the CMS (reusing the license key, cached to disk so a restart doesn't
-re-register) and checks whether a newer release is published.
+Registers this process as an `Installation` with the CMS, reports what it runs,
+and carries the transport half of applying an update: start, download, verify,
+report each step.
 
 ```ts
-// api.module.ts
+// api.module.ts (or a dedicated updater app)
 import { UpdateClientModule } from '@cmsnt/license-sdk/nest';
 
 const updateClientImports = cfg.updateClient.enabled
@@ -123,13 +123,70 @@ const updateClientImports = cfg.updateClient.enabled
 // ...imports: [...updateClientImports]
 ```
 
-`forRoot(options)` — `{ authorityUrl, licenseKey, environment, hostname?, label?,
-currentVersion?, requestTimeoutMs, installationStorePath? }`. `refresh()` ensures
-the installation is registered (once, persisted to `installationStorePath`,
-default `.license/installation.json`) then asks the CMS for the latest release.
-A failed check (authority unreachable, or the stored token got revoked) keeps
-the previous good numbers rather than resetting them — this is informational,
-not an enforcement gate, so a transient blip should never flash "no update".
+`forRoot(options)` — `{ authorityUrl, licenseKey, keyStorePath?, environment,
+hostname?, label?, currentVersion?, requestTimeoutMs, downloadIdleTimeoutMs?,
+heartbeatIntervalMs?, installationStorePath?, retry? }`.
+
+**The license key is read at runtime, not frozen at boot.** Production usually
+ships `LICENSE_KEY` empty — the customer types their key into the activation
+form and it lands in the key store on disk (`keyStorePath`, shared with
+`LicenseClientModule`). `LICENSE_KEY_SOURCE` re-reads it on every call, so
+re-activating with a different key takes effect without a restart. Before
+activation the client reports `no_license_key` and keeps retrying; that is a
+normal state for a freshly delivered install, not a misconfiguration.
+
+`heartbeatIntervalMs` (0 = off) starts `InstallationHeartbeat`: one beat plus
+one update check on a timer. It never blocks boot and never throws — a CMS
+outage costs the vendor a stale row, not the customer a working site.
+
+Service surface: `refresh({ maxAgeMs? })`, `getState()`, `heartbeat()`,
+`startUpdate(releaseId)`, `downloadComponent(releaseId, component, { destDir })`,
+`reportStep(jobId, { step, outcome, detail?, errorMessage? })`,
+`abandonJob(jobId, reason)`, `getInstallationId()`.
+
+**Errors are typed so callers can act on them**, rather than one "unreachable"
+that hides why: `InstallationUnauthorizedError` (401 — re-register),
+`InstallationForbiddenError` (403, with `code` — e.g. `updates_expired`: tell
+the operator to renew, re-registering will not help),
+`InstallationNotFoundError` (404), `UpdateConflictError` (409 — a job is
+already running, or the release is not published), and
+`InstallationAuthorityUnreachableError` for an actual failure to get an answer.
+Only the last is retried.
+
+**Retries are deliberate, not blanket.** `register`/`getUpdates`/`download` get
+3 attempts with full-jitter backoff; `reportStep` gets 5 (losing a step
+corrupts the vendor's only record of the job, and a lost `completed` leaves it
+looking stuck forever); `heartbeat` gets none (the next beat *is* the retry);
+`startUpdate` and `rotateToken` get none, because they are not idempotent and a
+retry whose first attempt actually landed is indistinguishable from a real
+conflict.
+
+**Downloads stream to disk.** A component tarball is hashed while streaming
+into a dot-prefixed `.part` file and renamed on success, so nothing large sits
+resident in memory and a half-written file can never be mistaken for a verified
+artifact. The timeout is an *idle* timeout, reset per chunk — a single deadline
+covering the whole transfer would abort every real download.
+
+**Verify before you unpack.** `startUpdate` returns `manifestToken`, an
+Ed25519-signed inventory of the release. Check it with
+`Ed25519ReleaseManifestVerifier` from `@cmsnt/license-sdk/core`, then
+`assertComponentDigest` each downloaded file against it:
+
+```ts
+import {
+  Ed25519ReleaseManifestVerifier, assertComponentDigest,
+  assertManifestMatchesRelease, findManifestComponent,
+} from '@cmsnt/license-sdk/core';
+
+const manifest = new Ed25519ReleaseManifestVerifier(publicKey).verify(job.manifestToken!);
+assertManifestMatchesRelease(manifest, releaseId);
+const file = await updates.downloadComponent(releaseId, 'api', { destDir });
+assertComponentDigest(findManifestComponent(manifest, 'api'), file);
+```
+
+A `manifestToken` of `null` means the CMS has no signing key configured.
+**Treat that as a refusal, not a pass** — an attacker impersonating the CMS
+would answer `null` too.
 
 **Status endpoint stays in your app**, same as the license one:
 
@@ -141,17 +198,17 @@ export class UpdateStatusController {
   async status() {
     const s = await this.updates.refresh({ maxAgeMs: 10_000 });
     return { updateAvailable: s.updateAvailable, currentVersion: s.currentVersion,
-             latestVersion: s.latestVersion, reason: s.reason };
+             latestVersion: s.latestVersion, reason: s.reason, updatesUntil: s.updatesUntil };
   }
 }
 ```
 
-> **Honest limits.** Independent of `LicenseClientModule` by design — if a
-> customer re-activates with a *different* license key at runtime, this
-> module's `licenseKey` option does not automatically follow it (the host app
-> would need to reconfigure/restart this module too). There is no download/
-> apply-the-update step here — that's a separate, not-yet-built concern; this
-> only answers "is a newer release available."
+> **Honest limits.** The SDK owns transport and verification; it does not
+> unpack, build, migrate or restart anything. Those steps depend entirely on
+> how a given product is deployed, so they belong to the product's own updater.
+> Independent of `LicenseClientModule` by design: a dedicated updater process
+> registers this alone and does not inherit a boot-blocking license gate, a
+> second recheck timer, or a second verifier racing over the same token cache.
 
 ## `edge` — frontend / Next.js middleware
 
