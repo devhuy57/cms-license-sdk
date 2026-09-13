@@ -13,9 +13,11 @@ import {
 import { UpdateClientService } from './update-client.service';
 import { UpdateRunner } from './update-runner';
 import { UpdateAuthorityHttpClient } from './update-authority.http-client';
+import { UPDATE_EXECUTOR } from './update-executor';
 import {
   INSTALLATION_AUTHORITY,
   INSTALLATION_TOKEN_STORE,
+  INSTALLED_VERSION_PROVIDER,
   LICENSE_KEY_SOURCE,
 } from './update-ports';
 
@@ -34,12 +36,16 @@ import {
  * Global so the service is injectable anywhere. Bring your own status
  * controller — auth is app-specific.
  *
- * `INSTALLED_VERSION_PROVIDER` and `UPDATE_EXECUTOR` are optional and NOT
- * provided here: only the host knows where its own version lives and how its
- * own deployment is rebuilt. Without the first, heartbeats fall back to the
- * static `currentVersion`; without the second, `UpdateRunner.run` throws a
- * clear error at call time rather than failing DI at boot — so a host that
- * only wants update *detection* still starts.
+ * The product's `UpdateExecutorPort` is passed through `options.executor`
+ * rather than provided by the host's own module: Nest resolves a provider's
+ * dependencies within the module that *declares* it, and `UpdateRunner` is
+ * declared here — so a token registered in the host's module would never
+ * reach it. A global module exports to others; it does not receive from them.
+ *
+ * Omit it and `UpdateRunner.run` throws a clear error at call time rather
+ * than failing DI at boot, so a host that only wants update *detection*
+ * still starts. `installedVersionProvider` is passed the same way and for
+ * the same reason.
  */
 @Module({})
 export class UpdateClientModule {
@@ -81,6 +87,24 @@ export class UpdateClientModule {
         },
         UpdateClientService,
         InstallationHeartbeat,
+        // Registered here, alongside UpdateRunner, because Nest resolves a
+        // provider's dependencies in the module that declares it — the host
+        // cannot supply this token from its own module.
+        ...(options.executor
+          ? [
+              options.executor,
+              { provide: UPDATE_EXECUTOR, useExisting: options.executor },
+            ]
+          : []),
+        ...(options.installedVersionProvider
+          ? [
+              options.installedVersionProvider,
+              {
+                provide: INSTALLED_VERSION_PROVIDER,
+                useExisting: options.installedVersionProvider,
+              },
+            ]
+          : []),
         UpdateRunner,
       ],
       exports: [UpdateClientService, UpdateRunner],

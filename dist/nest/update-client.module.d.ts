@@ -15,12 +15,16 @@ import { UpdateClientModuleOptions } from './update-client-constants';
  * Global so the service is injectable anywhere. Bring your own status
  * controller — auth is app-specific.
  *
- * `INSTALLED_VERSION_PROVIDER` and `UPDATE_EXECUTOR` are optional and NOT
- * provided here: only the host knows where its own version lives and how its
- * own deployment is rebuilt. Without the first, heartbeats fall back to the
- * static `currentVersion`; without the second, `UpdateRunner.run` throws a
- * clear error at call time rather than failing DI at boot — so a host that
- * only wants update *detection* still starts.
+ * The product's `UpdateExecutorPort` is passed through `options.executor`
+ * rather than provided by the host's own module: Nest resolves a provider's
+ * dependencies within the module that *declares* it, and `UpdateRunner` is
+ * declared here — so a token registered in the host's module would never
+ * reach it. A global module exports to others; it does not receive from them.
+ *
+ * Omit it and `UpdateRunner.run` throws a clear error at call time rather
+ * than failing DI at boot, so a host that only wants update *detection*
+ * still starts. `installedVersionProvider` is passed the same way and for
+ * the same reason.
  */
 export declare class UpdateClientModule {
     static forRoot(options: UpdateClientModuleOptions): DynamicModule;

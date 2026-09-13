@@ -209,8 +209,12 @@ export class UpdateStatusController {
 manifest, downloads and digest-checks every artifact, runs your hooks in
 order, and closes the job — rolling back and reporting honestly on failure.
 
-The product supplies `UPDATE_EXECUTOR`, everything that depends on *how it is
-deployed*:
+The product supplies its executor **through `forRoot` options**, not through
+its own module. Nest resolves a provider's dependencies within the module that
+declares it, and `UpdateRunner` is declared in `UpdateClientModule` — a token
+registered in the host's module would never reach it. A global module exports
+to others; it does not receive from them. The same applies to
+`installedVersionProvider`.
 
 ```ts
 @Injectable()
@@ -224,7 +228,11 @@ class ComposeExecutor implements UpdateExecutorPort {
   async rollback(ctx, failedStep, error) {}
   async finalize(ctx) {} // runs after the job is closed
 }
-// providers: [{ provide: UPDATE_EXECUTOR, useClass: ComposeExecutor }]
+// UpdateClientModule.forRoot({
+//   ...options,
+//   executor: ComposeExecutor,
+//   installedVersionProvider: InstalledReleaseStore,
+// })
 ```
 
 Only `install` and `healthCheck` are required. **An unimplemented optional

@@ -1,4 +1,7 @@
+import type { Type } from '@nestjs/common';
 import type { RetryPolicy } from './http-retry';
+import type { UpdateExecutorPort } from './update-executor';
+import type { InstalledVersionProviderPort } from './update-ports';
 export interface UpdateClientModuleOptions {
     authorityUrl: string;
     /**
@@ -54,6 +57,31 @@ export interface UpdateClientModuleOptions {
     publicKeyPem?: string;
     /** Overrides for the retry/backoff defaults. */
     retry?: Partial<RetryPolicy>;
+    /**
+     * The product's implementation of the shell half of an update.
+     *
+     * Passed here rather than provided by the host's own module, because Nest
+     * resolves a provider's dependencies within the module that *declares* it:
+     * `UpdateRunner` lives in this module, so a token registered in the host's
+     * module is invisible to it. A global module exports to others; it does not
+     * receive from them.
+     *
+     * Omit it for a host that only wants to *detect* updates — `UpdateRunner`
+     * then throws a clear error if anyone calls `run()`, rather than failing DI
+     * at boot.
+     */
+    executor?: Type<UpdateExecutorPort>;
+    /**
+     * Where the host keeps its real installed state, re-read on every
+     * heartbeat. Passed here for the same reason as `executor`:
+     * `UpdateClientService` is declared in this module, so a token the host
+     * registers in its own module never reaches it.
+     *
+     * Omit it and heartbeats fall back to the static `currentVersion` — which
+     * is the version baked in at *build* time, so after an update the host
+     * would keep reporting the version it shipped with.
+     */
+    installedVersionProvider?: Type<InstalledVersionProviderPort>;
 }
 export declare const UPDATE_CLIENT_OPTIONS: unique symbol;
 export declare const DEFAULT_INSTALLATION_STORE_PATH = ".license/installation.json";
