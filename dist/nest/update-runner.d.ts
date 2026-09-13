@@ -1,3 +1,4 @@
+import { type ReleaseManifestClaims } from '../core';
 import { UpdateClientModuleOptions } from './update-client-constants';
 import { UpdateClientService } from './update-client.service';
 import { type UpdateExecutorPort } from './update-executor';
@@ -41,6 +42,7 @@ export declare class UpdateRunner {
      */
     run(releaseId: string, hooks?: RunUpdateHooks): Promise<{
         jobId: string;
+        manifest: ReleaseManifestClaims;
     }>;
     /**
      * A missing manifest is a refusal, not a pass. An attacker impersonating

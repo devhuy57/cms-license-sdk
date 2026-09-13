@@ -315,7 +315,7 @@ describe('UpdateRunner', () => {
     const h = await build({});
     h.updates.reportStep.mockRejectedValue(new Error('CMS down'));
 
-    await expect(h.runner.run('rel-1')).resolves.toEqual({ jobId: 'job-1' });
+    await expect(h.runner.run('rel-1')).resolves.toMatchObject({ jobId: 'job-1' });
     expect(h.calls).toContain('install');
   });
 
@@ -348,7 +348,7 @@ describe('UpdateRunner', () => {
       },
     });
 
-    await expect(h.runner.run('rel-1')).resolves.toEqual({ jobId: 'job-1' });
+    await expect(h.runner.run('rel-1')).resolves.toMatchObject({ jobId: 'job-1' });
   });
 
   it('refuses a second concurrent run', async () => {

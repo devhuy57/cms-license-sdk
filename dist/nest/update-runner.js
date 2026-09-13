@@ -108,7 +108,10 @@ let UpdateRunner = UpdateRunner_1 = class UpdateRunner {
             await this.executor.finalize?.(ctx).catch((error) => {
                 this.logger.warn(`finalize failed: ${describe(error)}`);
             });
-            return { jobId: started.jobId };
+            // The manifest goes back to the caller so the host can record what it
+            // actually installed, per component — a heartbeat that reports only the
+            // release version loses the per-part detail the vendor's console shows.
+            return { jobId: started.jobId, manifest };
         }
         catch (error) {
             this.running = null;

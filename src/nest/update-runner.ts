@@ -104,7 +104,10 @@ export class UpdateRunner {
    * expected to run this detached and poll its own job log, since the
    * pipeline outlives any sensible HTTP timeout.
    */
-  async run(releaseId: string, hooks?: RunUpdateHooks): Promise<{ jobId: string }> {
+  async run(
+    releaseId: string,
+    hooks?: RunUpdateHooks,
+  ): Promise<{ jobId: string; manifest: ReleaseManifestClaims }> {
     if (!this.executor) throw new NoUpdateExecutorError();
     if (this.running) {
       throw new Error(
@@ -150,7 +153,10 @@ export class UpdateRunner {
         this.logger.warn(`finalize failed: ${describe(error)}`);
       });
 
-      return { jobId: started.jobId };
+      // The manifest goes back to the caller so the host can record what it
+      // actually installed, per component — a heartbeat that reports only the
+      // release version loses the per-part detail the vendor's console shows.
+      return { jobId: started.jobId, manifest };
     } catch (error) {
       this.running = null;
       throw error;
