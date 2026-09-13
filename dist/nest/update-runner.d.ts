@@ -30,6 +30,12 @@ export declare class UpdateRunner {
     private readonly updates;
     private readonly executor?;
     private readonly logger;
+    /**
+     * `step` is tracked here rather than passed around because `ctx.progress()`
+     * is called from deep inside a step's own work and has no other way to know
+     * which step it is reporting against. Only one job runs at a time, so a
+     * single slot is enough.
+     */
     private running;
     constructor(options: UpdateClientModuleOptions, updates: UpdateClientService, executor?: UpdateExecutorPort | undefined);
     isBusy(): boolean;

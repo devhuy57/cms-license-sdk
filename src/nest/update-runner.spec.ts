@@ -146,6 +146,27 @@ function stepsOf(updates: Harness['updates']): string[] {
 }
 
 describe('UpdateRunner', () => {
+  it('reports progress against the step that is actually running', async () => {
+    const h = await build({
+      executor: {
+        build: (ctx: UpdateStepContext) => {
+          ctx.progress(0.5, 'storefront');
+          return Promise.resolve(undefined);
+        },
+      },
+    });
+
+    const events: LocalStepEvent[] = [];
+    await h.runner.run('rel-1', { onStep: (event) => events.push(event) });
+
+    // A long `building` step used to emit `downloading` events, which the
+    // customer's progress panel rendered as a download stuck at 50%.
+    const progress = events.filter((e) => e.detail?.progress !== undefined);
+    expect(progress).toHaveLength(1);
+    expect(progress[0].step).toBe('building');
+    expect(progress[0].detail).toMatchObject({ progress: 0.5, note: 'storefront' });
+  });
+
   it('runs the whole pipeline and closes the job', async () => {
     const h = await build({
       executor: {

@@ -59,6 +59,12 @@ let UpdateRunner = UpdateRunner_1 = class UpdateRunner {
         this.updates = updates;
         this.executor = executor;
         this.logger = new common_1.Logger(UpdateRunner_1.name);
+        /**
+         * `step` is tracked here rather than passed around because `ctx.progress()`
+         * is called from deep inside a step's own work and has no other way to know
+         * which step it is reporting against. Only one job runs at a time, so a
+         * single slot is enough.
+         */
         this.running = null;
     }
     isBusy() {
@@ -81,7 +87,7 @@ let UpdateRunner = UpdateRunner_1 = class UpdateRunner {
         }
         const started = await this.updates.startUpdate(releaseId);
         const controller = new AbortController();
-        this.running = { jobId: started.jobId, controller };
+        this.running = { jobId: started.jobId, controller, step: 'pending' };
         const workDir = (0, node_path_1.join)(this.options.workDir ?? '.license/updates', started.jobId);
         try {
             const manifest = this.verifyManifest(started.manifestToken, releaseId);
@@ -233,6 +239,8 @@ let UpdateRunner = UpdateRunner_1 = class UpdateRunner {
     }
     /** Wraps one unit of work in a started/succeeded/failed pair of reports. */
     async step(ctx, step, hooks, work) {
+        if (this.running?.jobId === ctx.jobId)
+            this.running.step = step;
         await this.report(ctx.jobId, step, 'started', hooks);
         try {
             const { result, detail } = await work();
@@ -273,6 +281,7 @@ let UpdateRunner = UpdateRunner_1 = class UpdateRunner {
     }
     buildContext(input) {
         const logger = this.logger;
+        const runner = this;
         return {
             jobId: input.jobId,
             releaseId: input.releaseId,
@@ -288,7 +297,10 @@ let UpdateRunner = UpdateRunner_1 = class UpdateRunner {
             progress(fraction, note) {
                 input.hooks?.onStep?.({
                     jobId: input.jobId,
-                    step: 'downloading',
+                    // The step that is actually running. Hardcoding `downloading` here
+                    // made a long `building` step emit download events, which the
+                    // customer's progress panel then rendered as a stalled download.
+                    step: runner.running?.step ?? 'downloading',
                     outcome: 'started',
                     detail: { progress: Math.min(1, Math.max(0, fraction)), note },
                     at: new Date().toISOString(),

@@ -79,7 +79,17 @@ const MAX_ERROR_MESSAGE = 2000;
 @Injectable()
 export class UpdateRunner {
   private readonly logger = new Logger(UpdateRunner.name);
-  private running: { jobId: string; controller: AbortController } | null = null;
+  /**
+   * `step` is tracked here rather than passed around because `ctx.progress()`
+   * is called from deep inside a step's own work and has no other way to know
+   * which step it is reporting against. Only one job runs at a time, so a
+   * single slot is enough.
+   */
+  private running: {
+    jobId: string;
+    controller: AbortController;
+    step: UpdateStepName;
+  } | null = null;
 
   constructor(
     @Inject(UPDATE_CLIENT_OPTIONS)
@@ -117,7 +127,7 @@ export class UpdateRunner {
 
     const started = await this.updates.startUpdate(releaseId);
     const controller = new AbortController();
-    this.running = { jobId: started.jobId, controller };
+    this.running = { jobId: started.jobId, controller, step: 'pending' };
 
     const workDir = join(
       this.options.workDir ?? '.license/updates',
@@ -325,6 +335,7 @@ export class UpdateRunner {
     hooks: RunUpdateHooks | undefined,
     work: () => Promise<{ result: T; detail?: Record<string, unknown> }> | { result: T; detail?: Record<string, unknown> },
   ): Promise<T> {
+    if (this.running?.jobId === ctx.jobId) this.running.step = step;
     await this.report(ctx.jobId, step, 'started', hooks);
     try {
       const { result, detail } = await work();
@@ -391,6 +402,7 @@ export class UpdateRunner {
     hooks?: RunUpdateHooks;
   }): UpdateStepContext {
     const logger = this.logger;
+    const runner = this;
     return {
       jobId: input.jobId,
       releaseId: input.releaseId,
@@ -406,7 +418,10 @@ export class UpdateRunner {
       progress(fraction: number, note?: string) {
         input.hooks?.onStep?.({
           jobId: input.jobId,
-          step: 'downloading',
+          // The step that is actually running. Hardcoding `downloading` here
+          // made a long `building` step emit download events, which the
+          // customer's progress panel then rendered as a stalled download.
+          step: runner.running?.step ?? 'downloading',
           outcome: 'started',
           detail: { progress: Math.min(1, Math.max(0, fraction)), note },
           at: new Date().toISOString(),
