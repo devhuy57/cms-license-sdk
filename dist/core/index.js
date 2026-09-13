@@ -1,10 +1,27 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Ed25519LicenseVerifier = exports.Ed25519LicenseSigner = exports.isLicenseExpired = exports.isWithinGrace = exports.isTokenFresh = exports.deriveRuntimeSecret = exports.hashLicenseKey = exports.LICENSE_TOKEN_VERSION = void 0;
+exports.Ed25519LicenseVerifier = exports.Ed25519LicenseSigner = exports.isLicenseExpired = exports.isWithinGrace = exports.isTokenFresh = exports.deriveRuntimeSecret = exports.hashLicenseKey = exports.LICENSE_TOKEN_VERSION = exports.normalizePem = void 0;
 exports.buildLicenseTokenClaims = buildLicenseTokenClaims;
 exports.decodeLicenseTokenPayload = decodeLicenseTokenPayload;
-exports.normalizePem = normalizePem;
 const node_crypto_1 = require("node:crypto");
+const pem_1 = require("./pem");
+var pem_2 = require("./pem");
+Object.defineProperty(exports, "normalizePem", { enumerable: true, get: function () { return pem_2.normalizePem; } });
+__exportStar(require("./release-manifest"), exports);
 /**
  * Shared license-token contract + Node crypto. Used by the license SERVER (to
  * sign) and by Node BACKENDS (to verify). A token is
@@ -56,7 +73,7 @@ exports.isLicenseExpired = isLicenseExpired;
 class Ed25519LicenseSigner {
     /** Falls back to `process.env.LICENSE_PRIVATE_KEY_PEM` when omitted. */
     constructor(privateKeyPem) {
-        const pem = normalizePem(privateKeyPem?.trim() ? privateKeyPem : readEnv('LICENSE_PRIVATE_KEY_PEM'));
+        const pem = (0, pem_1.normalizePem)(privateKeyPem?.trim() ? privateKeyPem : (0, pem_1.readEnv)('LICENSE_PRIVATE_KEY_PEM'));
         if (!pem)
             throw new Error('license-core: privateKeyPem is required');
         this.key = (0, node_crypto_1.createPrivateKey)(pem);
@@ -78,7 +95,7 @@ exports.Ed25519LicenseSigner = Ed25519LicenseSigner;
 class Ed25519LicenseVerifier {
     /** Falls back to `process.env.LICENSE_PUBLIC_KEY` when omitted. */
     constructor(publicKeyPem) {
-        const pem = normalizePem(publicKeyPem?.trim() ? publicKeyPem : readEnv('LICENSE_PUBLIC_KEY'));
+        const pem = (0, pem_1.normalizePem)(publicKeyPem?.trim() ? publicKeyPem : (0, pem_1.readEnv)('LICENSE_PUBLIC_KEY'));
         if (!pem)
             throw new Error('license-core: publicKeyPem is required');
         this.key = (0, node_crypto_1.createPublicKey)(pem);
@@ -97,26 +114,3 @@ class Ed25519LicenseVerifier {
     }
 }
 exports.Ed25519LicenseVerifier = Ed25519LicenseVerifier;
-/** Safe process.env read (never throws, works if `process` is absent). */
-function readEnv(name) {
-    try {
-        return ((typeof process !== 'undefined' && process.env && process.env[name]) || '');
-    }
-    catch {
-        return '';
-    }
-}
-/** Accept a full PEM or base64-of-PEM (env-var friendly). */
-function normalizePem(value) {
-    const trimmed = value?.trim();
-    if (!trimmed)
-        return '';
-    if (trimmed.includes('-----BEGIN'))
-        return trimmed;
-    try {
-        return Buffer.from(trimmed, 'base64').toString('utf8');
-    }
-    catch {
-        return trimmed;
-    }
-}

@@ -7,6 +7,10 @@ import {
   sign as cryptoSign,
   verify as cryptoVerify,
 } from 'node:crypto';
+import { normalizePem, readEnv } from './pem';
+
+export { normalizePem } from './pem';
+export * from './release-manifest';
 
 /**
  * Shared license-token contract + Node crypto. Used by the license SERVER (to
@@ -152,28 +156,5 @@ export class Ed25519LicenseVerifier {
     );
     if (!ok) throw new Error('signature verification failed');
     return decodeLicenseTokenPayload(token);
-  }
-}
-
-/** Safe process.env read (never throws, works if `process` is absent). */
-function readEnv(name: string): string {
-  try {
-    return (
-      (typeof process !== 'undefined' && process.env && process.env[name]) || ''
-    );
-  } catch {
-    return '';
-  }
-}
-
-/** Accept a full PEM or base64-of-PEM (env-var friendly). */
-export function normalizePem(value: string): string {
-  const trimmed = value?.trim();
-  if (!trimmed) return '';
-  if (trimmed.includes('-----BEGIN')) return trimmed;
-  try {
-    return Buffer.from(trimmed, 'base64').toString('utf8');
-  } catch {
-    return trimmed;
   }
 }

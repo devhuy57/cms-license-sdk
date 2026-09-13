@@ -1,3 +1,5 @@
+export { normalizePem } from './pem';
+export * from './release-manifest';
 /**
  * Shared license-token contract + Node crypto. Used by the license SERVER (to
  * sign) and by Node BACKENDS (to verify). A token is
@@ -63,5 +65,3 @@ export declare class Ed25519LicenseVerifier {
     constructor(publicKeyPem?: string);
     verify(token: string): LicenseTokenClaims;
 }
-/** Accept a full PEM or base64-of-PEM (env-var friendly). */
-export declare function normalizePem(value: string): string;
