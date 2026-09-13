@@ -203,12 +203,57 @@ export class UpdateStatusController {
 }
 ```
 
-> **Honest limits.** The SDK owns transport and verification; it does not
-> unpack, build, migrate or restart anything. Those steps depend entirely on
-> how a given product is deployed, so they belong to the product's own updater.
-> Independent of `LicenseClientModule` by design: a dedicated updater process
-> registers this alone and does not inherit a boot-blocking license gate, a
-> second recheck timer, or a second verifier racing over the same token cache.
+### `nest` — applying an update
+
+`UpdateRunner` drives a whole update: it opens the job, verifies the signed
+manifest, downloads and digest-checks every artifact, runs your hooks in
+order, and closes the job — rolling back and reporting honestly on failure.
+
+The product supplies `UPDATE_EXECUTOR`, everything that depends on *how it is
+deployed*:
+
+```ts
+@Injectable()
+class ComposeExecutor implements UpdateExecutorPort {
+  async install(ctx) { /* extract ctx.components over the source tree */ }
+  async healthCheck(ctx, phase) { /* poll until the new build answers */ }
+  async backup(ctx) { /* whatever rollback will need */ }
+  async migrate(ctx) {}
+  async build(ctx) {}
+  async switchOver(ctx) {}
+  async rollback(ctx, failedStep, error) {}
+  async finalize(ctx) {} // runs after the job is closed
+}
+// providers: [{ provide: UPDATE_EXECUTOR, useClass: ComposeExecutor }]
+```
+
+Only `install` and `healthCheck` are required. **An unimplemented optional
+hook emits no step at all** rather than a fabricated `succeeded`, so the
+vendor's timeline shows what actually ran.
+
+Order: `pending → downloading → verifying → backing_up → installing →
+migrating → health_check(api) → building → switching → health_check(all) →
+restarting → completed`. **`migrating` deliberately precedes `building`**:
+migrations and the backend are where updates go wrong, rebuilding front-ends
+is where they cost twenty minutes, so the cheap fragile step runs first.
+
+`rollback` is optional, and its absence is meaningful — without it a failure
+ends the job at `failed`, not `rolled_back`, because nothing was undone.
+Claiming otherwise would tell the vendor a half-updated deployment recovered.
+
+`finalize` runs *after* the job is closed, for work that must not be able to
+corrupt it — most of all a product whose updater is itself part of the
+release, replacing its own container.
+
+Step reporting is best-effort throughout: a CMS outage must not abort an
+update that is already rewriting a customer's source tree.
+
+> **Honest limits.** The SDK owns transport, verification and orchestration;
+> it does not unpack, build, migrate or restart anything — those are shell
+> commands wired to one deployment topology. Independent of
+> `LicenseClientModule` by design: a dedicated updater process registers this
+> alone and does not inherit a boot-blocking license gate, a second recheck
+> timer, or a second verifier racing over the same token cache.
 
 ## `edge` — frontend / Next.js middleware
 

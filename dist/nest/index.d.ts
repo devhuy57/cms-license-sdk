@@ -6,6 +6,8 @@ export { LICENSE_AUTHORITY, TOKEN_CACHE, TOKEN_VERIFIER, LicenseAuthorityUnreach
 export { UpdateClientModule } from './update-client.module';
 export { UpdateClientService } from './update-client.service';
 export { InstallationHeartbeat } from './installation-heartbeat';
+export { UpdateRunner, type LocalStepEvent, type RunUpdateHooks, } from './update-runner';
+export { UPDATE_EXECUTOR, NoUpdateExecutorError, ReleaseManifestMissingError, type StepDetail, type UpdateExecutorPort, type UpdateStepContext, type VerifiedComponent, } from './update-executor';
 export { UPDATE_CLIENT_OPTIONS, DEFAULT_INSTALLATION_STORE_PATH, DEFAULT_DOWNLOAD_IDLE_TIMEOUT_MS, DEFAULT_HEARTBEAT_INTERVAL_MS, type UpdateClientModuleOptions, } from './update-client-constants';
 export { DEFAULT_RETRY_POLICY, withRetry, type RetryPolicy, } from './http-retry';
 export { DEFAULT_KEY_STORE_PATH } from './constants';

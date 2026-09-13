@@ -37,6 +37,21 @@ export interface UpdateClientModuleOptions {
     heartbeatIntervalMs?: number;
     /** File that persists the minted installation id + token across restarts. */
     installationStorePath?: string;
+    /**
+     * Scratch space for update jobs (downloads, staging). One directory per
+     * job, created and removed by the runner.
+     */
+    workDir?: string;
+    /**
+     * Ed25519 public key (PEM or base64-of-PEM) that release manifests are
+     * verified against — the same key that signs license tokens.
+     *
+     * Required to apply an update. There is no "unsigned is acceptable" mode:
+     * without a manifest there is nothing to check a downloaded artifact
+     * against, so allowing it would not be a relaxed policy, it would be no
+     * policy at all.
+     */
+    publicKeyPem?: string;
     /** Overrides for the retry/backoff defaults. */
     retry?: Partial<RetryPolicy>;
 }

@@ -15,9 +15,12 @@ import { UpdateClientModuleOptions } from './update-client-constants';
  * Global so the service is injectable anywhere. Bring your own status
  * controller — auth is app-specific.
  *
- * `INSTALLED_VERSION_PROVIDER` is optional and NOT provided here: only the
- * host knows where its own version lives. Without it, heartbeats fall back to
- * the static `currentVersion` option.
+ * `INSTALLED_VERSION_PROVIDER` and `UPDATE_EXECUTOR` are optional and NOT
+ * provided here: only the host knows where its own version lives and how its
+ * own deployment is rebuilt. Without the first, heartbeats fall back to the
+ * static `currentVersion`; without the second, `UpdateRunner.run` throws a
+ * clear error at call time rather than failing DI at boot — so a host that
+ * only wants update *detection* still starts.
  */
 export declare class UpdateClientModule {
     static forRoot(options: UpdateClientModuleOptions): DynamicModule;

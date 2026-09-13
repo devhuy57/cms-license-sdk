@@ -16,6 +16,7 @@ const constants_1 = require("./constants");
 const key_store_1 = require("./key-store");
 const update_client_constants_1 = require("./update-client-constants");
 const update_client_service_1 = require("./update-client.service");
+const update_runner_1 = require("./update-runner");
 const update_authority_http_client_1 = require("./update-authority.http-client");
 const update_ports_1 = require("./update-ports");
 /**
@@ -33,9 +34,12 @@ const update_ports_1 = require("./update-ports");
  * Global so the service is injectable anywhere. Bring your own status
  * controller — auth is app-specific.
  *
- * `INSTALLED_VERSION_PROVIDER` is optional and NOT provided here: only the
- * host knows where its own version lives. Without it, heartbeats fall back to
- * the static `currentVersion` option.
+ * `INSTALLED_VERSION_PROVIDER` and `UPDATE_EXECUTOR` are optional and NOT
+ * provided here: only the host knows where its own version lives and how its
+ * own deployment is rebuilt. Without the first, heartbeats fall back to the
+ * static `currentVersion`; without the second, `UpdateRunner.run` throws a
+ * clear error at call time rather than failing DI at boot — so a host that
+ * only wants update *detection* still starts.
  */
 let UpdateClientModule = UpdateClientModule_1 = class UpdateClientModule {
     static forRoot(options) {
@@ -66,8 +70,9 @@ let UpdateClientModule = UpdateClientModule_1 = class UpdateClientModule {
                 },
                 update_client_service_1.UpdateClientService,
                 installation_heartbeat_1.InstallationHeartbeat,
+                update_runner_1.UpdateRunner,
             ],
-            exports: [update_client_service_1.UpdateClientService],
+            exports: [update_client_service_1.UpdateClientService, update_runner_1.UpdateRunner],
         };
     }
 };
