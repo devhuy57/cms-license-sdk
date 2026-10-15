@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_HEARTBEAT_INTERVAL_MS = exports.DEFAULT_DOWNLOAD_IDLE_TIMEOUT_MS = exports.DEFAULT_INSTALLATION_STORE_PATH = exports.UPDATE_CLIENT_OPTIONS = void 0;
+exports.DEFAULT_PENDING_ACTION_POLL_MS = exports.DEFAULT_HEARTBEAT_INTERVAL_MS = exports.DEFAULT_DOWNLOAD_IDLE_TIMEOUT_MS = exports.DEFAULT_INSTALLATION_STORE_PATH = exports.UPDATE_CLIENT_OPTIONS = void 0;
 exports.UPDATE_CLIENT_OPTIONS = Symbol('UPDATE_CLIENT_OPTIONS');
 exports.DEFAULT_INSTALLATION_STORE_PATH = '.license/installation.json';
 exports.DEFAULT_DOWNLOAD_IDLE_TIMEOUT_MS = 120_000;
@@ -10,3 +10,8 @@ exports.DEFAULT_DOWNLOAD_IDLE_TIMEOUT_MS = 120_000;
  * customer is offered a new release.
  */
 exports.DEFAULT_HEARTBEAT_INTERVAL_MS = 900_000;
+/**
+ * 30 seconds: "update these installations now" should land in about the time
+ * an admin waits on the page, while still being one cheap GET per poll.
+ */
+exports.DEFAULT_PENDING_ACTION_POLL_MS = 30_000;

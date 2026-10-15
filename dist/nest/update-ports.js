@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.INSTALLED_VERSION_PROVIDER = exports.LICENSE_KEY_SOURCE = exports.INSTALLATION_TOKEN_STORE = exports.UpdateConflictError = exports.InstallationNotFoundError = exports.InstallationForbiddenError = exports.InstallationUnauthorizedError = exports.InstallationAuthorityUnreachableError = exports.INSTALLATION_AUTHORITY = void 0;
+exports.INSTALLED_VERSION_PROVIDER = exports.LICENSE_KEY_SOURCE = exports.INSTALLATION_TOKEN_STORE = exports.UpdateConflictError = exports.InstallationNotFoundError = exports.InstallationForbiddenError = exports.InstallationUnauthorizedError = exports.InstallationAuthorityUnreachableError = exports.INSTALLATION_AUTHORITY = exports.REMOTE_UPDATE_CAPABILITY = void 0;
+/** Heartbeat `metadata.capabilities` entry: this client acts on {@link PendingAction}. */
+exports.REMOTE_UPDATE_CAPABILITY = 'remote_update';
 exports.INSTALLATION_AUTHORITY = Symbol('UPDATE_CLIENT_INSTALLATION_AUTHORITY');
 class InstallationAuthorityUnreachableError extends Error {
     constructor(message) {

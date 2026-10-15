@@ -30,6 +30,8 @@ const okUpdates: AvailableUpdateResult = {
   latestReleaseId: 'release-1',
   reason: null,
   updatesUntil: null,
+  latestReleaseNotes: null,
+  pendingAction: null,
 };
 
 const okRegister: RegisterInstallationResult = {
@@ -46,7 +48,7 @@ function build(parts: {
   const authority = {
     register: jest.fn().mockResolvedValue(okRegister),
     getUpdates: jest.fn().mockResolvedValue(okUpdates),
-    heartbeat: jest.fn().mockResolvedValue(undefined),
+    heartbeat: jest.fn().mockResolvedValue({ pendingAction: null }),
     rotateToken: jest.fn().mockResolvedValue(okRegister),
     startUpdate: jest.fn().mockResolvedValue({ jobId: 'job-1' }),
     reportStep: jest.fn().mockResolvedValue({ status: 'downloading' }),
@@ -318,5 +320,100 @@ describe('license-sdk/nest UpdateClientService', () => {
     await Promise.all([service.heartbeat(), service.refresh()]);
 
     expect(authority.register).toHaveBeenCalledTimes(1);
+  });
+
+  describe('remote updates', () => {
+    const action = {
+      type: 'update' as const,
+      requestId: 'req-1',
+      releaseId: 'release-1',
+      version: '1.1.0',
+      source: 'force' as const,
+    };
+
+    it('advertises the capability on register and heartbeat only when enabled', async () => {
+      const off = build({});
+      await off.service.heartbeat();
+      expect(off.authority.heartbeat).toHaveBeenCalledWith(
+        'install-1',
+        'token-1',
+        expect.not.objectContaining({
+          metadata: expect.objectContaining({ capabilities: expect.anything() }),
+        }),
+      );
+
+      const on = build({ options: { remoteUpdates: true } });
+      await on.service.heartbeat();
+      expect(on.authority.register).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: { capabilities: ['remote_update'] },
+        }),
+      );
+      expect(on.authority.heartbeat).toHaveBeenCalledWith(
+        'install-1',
+        'token-1',
+        expect.objectContaining({
+          metadata: { capabilities: ['remote_update'] },
+        }),
+      );
+    });
+
+    it('hands a pending action from a heartbeat or a check to every listener', async () => {
+      const { service } = build({
+        options: { remoteUpdates: true },
+        authority: {
+          heartbeat: jest.fn().mockResolvedValue({ pendingAction: action }),
+          getUpdates: jest
+            .fn()
+            .mockResolvedValue({ ...okUpdates, pendingAction: action }),
+        },
+      });
+      const seen: string[] = [];
+      service.onPendingAction((a) => {
+        seen.push(a.requestId);
+      });
+
+      await service.heartbeat();
+      const state = await service.refresh();
+
+      expect(seen).toEqual(['req-1', 'req-1']);
+      expect(state.pendingAction).toEqual(action);
+    });
+
+    it('ignores instructions unless remote updates are enabled', async () => {
+      const { service } = build({
+        authority: {
+          heartbeat: jest.fn().mockResolvedValue({ pendingAction: action }),
+        },
+      });
+      const listener = jest.fn();
+      service.onPendingAction(listener);
+      await service.heartbeat();
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('a failing listener never fails the heartbeat', async () => {
+      const { service } = build({
+        options: { remoteUpdates: true },
+        authority: {
+          heartbeat: jest.fn().mockResolvedValue({ pendingAction: action }),
+        },
+      });
+      service.onPendingAction(() => {
+        throw new Error('busy');
+      });
+      await expect(service.heartbeat()).resolves.toBeUndefined();
+    });
+
+    it('keeps the CMS release notes from the update check', async () => {
+      const { service } = build({
+        authority: {
+          getUpdates: jest
+            .fn()
+            .mockResolvedValue({ ...okUpdates, latestReleaseNotes: '### Thêm mới' }),
+        },
+      });
+      expect((await service.refresh()).latestReleaseNotes).toBe('### Thêm mới');
+    });
   });
 });

@@ -3,6 +3,26 @@ export interface RegisterInstallationResult {
     installationId: string;
     installationToken: string;
 }
+/**
+ * An instruction from the vendor: start this update now. Handed out when an
+ * admin picked this installation, or the release was forced on everyone.
+ * Only sent to installations that advertise {@link REMOTE_UPDATE_CAPABILITY}.
+ */
+export interface PendingAction {
+    type: 'update';
+    /** The CMS's request id; the start call is credited to it server-side. */
+    requestId: string;
+    releaseId: string;
+    version: string;
+    /** `admin`: picked by hand. `force`: the release was forced. */
+    source: 'admin' | 'force';
+}
+/** Heartbeat `metadata.capabilities` entry: this client acts on {@link PendingAction}. */
+export declare const REMOTE_UPDATE_CAPABILITY = "remote_update";
+/** What the CMS answers a heartbeat with that the client cares about. */
+export interface HeartbeatResult {
+    pendingAction: PendingAction | null;
+}
 /** Raw "is a newer release available" result (response envelope already unwrapped). */
 export interface AvailableUpdateResult {
     updateAvailable: boolean;
@@ -16,6 +36,10 @@ export interface AvailableUpdateResult {
     reason: string | null;
     /** Update entitlement cut-off; null = unlimited. */
     updatesUntil: string | null;
+    /** Release notes of `latestVersion` as published on the CMS, if any. */
+    latestReleaseNotes: string | null;
+    /** A vendor-requested update to start now, if any (older CMS: always null). */
+    pendingAction: PendingAction | null;
 }
 /** What this installation reports it is running. */
 export interface HeartbeatInput {
@@ -94,7 +118,7 @@ export interface InstallationAuthorityPort {
         metadata?: Record<string, unknown>;
     }): Promise<RegisterInstallationResult>;
     getUpdates(installationId: string, installationToken: string): Promise<AvailableUpdateResult>;
-    heartbeat(installationId: string, installationToken: string, input: HeartbeatInput): Promise<void>;
+    heartbeat(installationId: string, installationToken: string, input: HeartbeatInput): Promise<HeartbeatResult>;
     rotateToken(installationId: string, installationToken: string): Promise<RegisterInstallationResult>;
     startUpdate(installationId: string, installationToken: string, releaseId: string): Promise<StartUpdateResult>;
     reportStep(installationId: string, installationToken: string, jobId: string, input: ReportStepInput): Promise<{

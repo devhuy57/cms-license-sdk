@@ -1,3 +1,4 @@
+import type { PendingAction } from './update-ports';
 export type UpdateClientReason = 'no_license_key' | 'unauthorized'
 /** The CMS refused on policy grounds — usually a lapsed update entitlement. */
  | 'forbidden' | 'authority_unreachable';
@@ -13,5 +14,9 @@ export interface UpdateClientState {
     reason: UpdateClientReason | null;
     /** Update entitlement cut-off reported by the CMS; null = unlimited. */
     updatesUntil: string | null;
+    /** Release notes of `latestVersion` as published on the CMS, if any. */
+    latestReleaseNotes: string | null;
+    /** The vendor's latest instruction (update now), if any. */
+    pendingAction: PendingAction | null;
     lastCheckedAt: string | null;
 }

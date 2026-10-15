@@ -26,6 +26,8 @@ const INITIAL_STATE = {
     latestReleaseId: null,
     reason: null,
     updatesUntil: null,
+    latestReleaseNotes: null,
+    pendingAction: null,
     lastCheckedAt: null,
 };
 /**
@@ -52,10 +54,23 @@ let UpdateClientService = UpdateClientService_1 = class UpdateClientService {
          * leaving one of them holding a credential the CMS has already replaced.
          */
         this.registering = null;
+        this.listeners = new Set();
         this.retry = { ...http_retry_1.DEFAULT_RETRY_POLICY, ...(options.retry ?? {}) };
     }
     getState() {
         return this.state;
+    }
+    /**
+     * Subscribe to vendor instructions (needs `remoteUpdates: true`). Called
+     * every time a heartbeat or check sees one — not once: the CMS keeps
+     * handing out a request until the installation starts it, so a listener
+     * that was busy the first time simply acts on a later call. The listener
+     * owns that guard; it must not start a second update while one runs.
+     * Returns an unsubscribe function.
+     */
+    onPendingAction(listener) {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
     }
     /** The registered installation id, or null before the first registration. */
     async getInstallationId() {
@@ -89,7 +104,12 @@ let UpdateClientService = UpdateClientService_1 = class UpdateClientService {
         };
         // Deliberately not retried: the next beat *is* the retry, and stacking
         // attempts on a timer only deepens a backlog against a struggling CMS.
-        await this.withAuth((c) => this.authority.heartbeat(c.installationId, c.installationToken, reported));
+        const result = await this.withAuth((c) => this.authority.heartbeat(c.installationId, c.installationToken, {
+            ...reported,
+            metadata: this.withCapabilities(reported.metadata),
+        }));
+        this.state = { ...this.state, pendingAction: result?.pendingAction ?? null };
+        await this.dispatch(this.state.pendingAction);
     }
     /**
      * Begin an update to `releaseId`. Not retried: it is not idempotent, and a
@@ -136,8 +156,11 @@ let UpdateClientService = UpdateClientService_1 = class UpdateClientService {
                 latestReleaseId: result.latestReleaseId,
                 reason: null,
                 updatesUntil: result.updatesUntil,
+                latestReleaseNotes: result.latestReleaseNotes ?? null,
+                pendingAction: result.pendingAction ?? null,
                 lastCheckedAt: now.toISOString(),
             };
+            await this.dispatch(this.state.pendingAction);
             return this.state;
         }
         catch (err) {
@@ -215,6 +238,7 @@ let UpdateClientService = UpdateClientService_1 = class UpdateClientService {
             hostname: this.options.hostname,
             label: this.options.label,
             currentVersion: reported?.currentVersion ?? this.options.currentVersion,
+            metadata: this.withCapabilities(reported?.metadata),
         }), this.retry, isRetryable);
         const credentials = {
             installationId: registered.installationId,
@@ -222,6 +246,31 @@ let UpdateClientService = UpdateClientService_1 = class UpdateClientService {
         };
         await this.store.write(credentials);
         return credentials;
+    }
+    /** Adds `remote_update` to the reported capabilities when this client acts on instructions. */
+    withCapabilities(metadata) {
+        if (!this.options.remoteUpdates)
+            return metadata;
+        const existing = Array.isArray(metadata?.capabilities)
+            ? metadata.capabilities
+            : [];
+        return {
+            ...(metadata ?? {}),
+            capabilities: [...new Set([...existing, update_ports_1.REMOTE_UPDATE_CAPABILITY])],
+        };
+    }
+    /** Hand an instruction to every listener. A listener's failure is logged, never thrown. */
+    async dispatch(action) {
+        if (!action || !this.options.remoteUpdates)
+            return;
+        for (const listener of this.listeners) {
+            try {
+                await listener(action);
+            }
+            catch (err) {
+                this.logger.warn(`Pending action ${action.requestId} not handled: ${err instanceof Error ? err.message : String(err)}`);
+            }
+        }
     }
     /** A failed check keeps the previous good `updateAvailable`/version numbers, only updating `reason`/`lastCheckedAt`. */
     fail(reason, now) {

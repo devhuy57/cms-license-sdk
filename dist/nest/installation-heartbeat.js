@@ -37,6 +37,7 @@ let InstallationHeartbeat = InstallationHeartbeat_1 = class InstallationHeartbea
         this.updates = updates;
         this.logger = new common_1.Logger(InstallationHeartbeat_1.name);
         this.timer = null;
+        this.pollTimer = null;
     }
     async onApplicationBootstrap() {
         const intervalMs = this.options.heartbeatIntervalMs ?? 0;
@@ -46,11 +47,32 @@ let InstallationHeartbeat = InstallationHeartbeat_1 = class InstallationHeartbea
         this.timer = setInterval(() => void this.beat(), intervalMs);
         // Never hold the process open just to send a heartbeat.
         this.timer.unref?.();
+        // A vendor-requested update should not wait for the next heartbeat: poll
+        // the (light) update check for instructions in between.
+        const pollMs = this.options.remoteUpdates
+            ? (this.options.pendingActionPollIntervalMs ??
+                update_client_constants_1.DEFAULT_PENDING_ACTION_POLL_MS)
+            : 0;
+        if (pollMs > 0 && pollMs < intervalMs) {
+            this.pollTimer = setInterval(() => void this.poll(), pollMs);
+            this.pollTimer.unref?.();
+        }
     }
     onModuleDestroy() {
         if (this.timer)
             clearInterval(this.timer);
+        if (this.pollTimer)
+            clearInterval(this.pollTimer);
         this.timer = null;
+        this.pollTimer = null;
+    }
+    async poll() {
+        try {
+            await this.updates?.refresh();
+        }
+        catch {
+            // `refresh` is total; nothing to add to the heartbeat's own logging.
+        }
     }
     async beat() {
         try {

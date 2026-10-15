@@ -142,7 +142,21 @@ outage costs the vendor a stale row, not the customer a working site.
 Service surface: `refresh({ maxAgeMs? })`, `getState()`, `heartbeat()`,
 `startUpdate(releaseId)`, `downloadComponent(releaseId, component, { destDir })`,
 `reportStep(jobId, { step, outcome, detail?, errorMessage? })`,
-`abandonJob(jobId, reason)`, `getInstallationId()`.
+`abandonJob(jobId, reason)`, `getInstallationId()`, `onPendingAction(listener)`.
+
+**Vendor-requested updates** (`remoteUpdates: true`, CMS with update requests).
+The CMS cannot reach an installation, so when an admin asks it to update (or
+forces a release) the request rides back on the next heartbeat or update check
+as `pendingAction: { type: 'update', requestId, releaseId, version, source }`.
+With `remoteUpdates` on, the client advertises the `remote_update` capability
+(the CMS only queues requests for clients that do), polls the update check
+every `pendingActionPollIntervalMs` (default 30 s) between heartbeats, and
+calls every `onPendingAction` listener with each instruction it sees. The
+instruction repeats until the update is started — the listener must ignore it
+while an update is already running. Starting the update with
+`startUpdate(action.releaseId)` is all it takes; the CMS credits the job to the
+request itself. `getState()` also carries `pendingAction` and the CMS's
+`latestReleaseNotes`. An older CMS sends neither, and nothing changes.
 
 **Errors are typed so callers can act on them**, rather than one "unreachable"
 that hides why: `InstallationUnauthorizedError` (401 — re-register),

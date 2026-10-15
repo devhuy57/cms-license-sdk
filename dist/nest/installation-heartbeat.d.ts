@@ -20,8 +20,10 @@ export declare class InstallationHeartbeat implements OnApplicationBootstrap, On
     private readonly updates?;
     private readonly logger;
     private timer;
+    private pollTimer;
     constructor(options: UpdateClientModuleOptions, updates?: UpdateClientService | undefined);
     onApplicationBootstrap(): Promise<void>;
     onModuleDestroy(): void;
+    private poll;
     private beat;
 }

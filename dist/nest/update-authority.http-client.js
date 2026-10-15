@@ -46,14 +46,17 @@ class UpdateAuthorityHttpClient {
             latestReleaseId: data?.latestRelease?.id ?? null,
             reason: data?.reason ?? null,
             updatesUntil: data?.updatesUntil ?? null,
+            latestReleaseNotes: data?.latestRelease?.releaseNotes ?? null,
+            pendingAction: parsePendingAction(data?.pendingAction),
         };
     }
     async heartbeat(installationId, installationToken, input) {
-        await this.json(`${this.base}/${installationId}/heartbeat`, {
+        const data = await this.json(`${this.base}/${installationId}/heartbeat`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify(input),
         }, installationToken);
+        return { pendingAction: parsePendingAction(data?.pendingAction) };
     }
     async rotateToken(installationId, installationToken) {
         const body = await this.json(`${this.base}/${installationId}/rotate-token`, { method: 'POST' }, installationToken);
@@ -286,4 +289,27 @@ function fileNameFromDisposition(header) {
 /** Strip anything that could steer the write out of `destDir`. */
 function safeName(fileName) {
     return fileName.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 128);
+}
+/**
+ * Accepts only a well-formed update instruction. Anything else — an older CMS
+ * that sends nothing, a field this client does not understand — reads as "no
+ * instruction", never as an error: a heartbeat must not fail over it.
+ */
+function parsePendingAction(raw) {
+    if (!raw || typeof raw !== 'object')
+        return null;
+    const a = raw;
+    if (a.type !== 'update' ||
+        typeof a.requestId !== 'string' ||
+        typeof a.releaseId !== 'string' ||
+        typeof a.version !== 'string') {
+        return null;
+    }
+    return {
+        type: 'update',
+        requestId: a.requestId,
+        releaseId: a.releaseId,
+        version: a.version,
+        source: a.source === 'force' ? 'force' : 'admin',
+    };
 }

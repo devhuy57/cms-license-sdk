@@ -17,7 +17,10 @@ export {
 } from './ports';
 
 export { UpdateClientModule } from './update-client.module';
-export { UpdateClientService } from './update-client.service';
+export {
+  UpdateClientService,
+  type PendingActionListener,
+} from './update-client.service';
 export { InstallationHeartbeat } from './installation-heartbeat';
 export {
   UpdateRunner,
@@ -38,6 +41,7 @@ export {
   DEFAULT_INSTALLATION_STORE_PATH,
   DEFAULT_DOWNLOAD_IDLE_TIMEOUT_MS,
   DEFAULT_HEARTBEAT_INTERVAL_MS,
+  DEFAULT_PENDING_ACTION_POLL_MS,
   type UpdateClientModuleOptions,
 } from './update-client-constants';
 export {
@@ -57,6 +61,7 @@ export {
   INSTALLATION_TOKEN_STORE,
   INSTALLED_VERSION_PROVIDER,
   LICENSE_KEY_SOURCE,
+  REMOTE_UPDATE_CAPABILITY,
   InstallationAuthorityUnreachableError,
   InstallationForbiddenError,
   InstallationNotFoundError,
@@ -66,11 +71,13 @@ export {
   type DownloadComponentOptions,
   type DownloadedComponentFile,
   type HeartbeatInput,
+  type HeartbeatResult,
   type InstallationAuthorityPort,
   type InstallationCredentials,
   type InstallationTokenStorePort,
   type InstalledVersionProviderPort,
   type LicenseKeySourcePort,
+  type PendingAction,
   type RegisterInstallationResult,
   type ReleaseComponentSnapshot,
   type ReportStepInput,

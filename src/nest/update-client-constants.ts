@@ -83,6 +83,21 @@ export interface UpdateClientModuleOptions {
    * would keep reporting the version it shipped with.
    */
   installedVersionProvider?: Type<InstalledVersionProviderPort>;
+  /**
+   * Act on vendor-requested updates. When true the client advertises the
+   * `remote_update` capability (register + heartbeat), so the CMS starts
+   * handing it `pendingAction`, and every listener registered through
+   * `UpdateClientService.onPendingAction` is called with it. Leave it off
+   * unless something actually starts the update — the CMS would otherwise
+   * queue requests nobody carries out.
+   */
+  remoteUpdates?: boolean;
+  /**
+   * How often to ask the CMS for a pending instruction between heartbeats
+   * (a light `GET .../updates`). Only used with `remoteUpdates`; `0` relies on
+   * the heartbeat alone. Defaults to {@link DEFAULT_PENDING_ACTION_POLL_MS}.
+   */
+  pendingActionPollIntervalMs?: number;
 }
 
 export const UPDATE_CLIENT_OPTIONS = Symbol('UPDATE_CLIENT_OPTIONS');
@@ -95,3 +110,9 @@ export const DEFAULT_DOWNLOAD_IDLE_TIMEOUT_MS = 120_000;
  * customer is offered a new release.
  */
 export const DEFAULT_HEARTBEAT_INTERVAL_MS = 900_000;
+
+/**
+ * 30 seconds: "update these installations now" should land in about the time
+ * an admin waits on the page, while still being one cheap GET per poll.
+ */
+export const DEFAULT_PENDING_ACTION_POLL_MS = 30_000;

@@ -1,4 +1,4 @@
-import { AvailableUpdateResult, DownloadComponentOptions, DownloadedComponentFile, HeartbeatInput, InstallationAuthorityPort, RegisterInstallationResult, ReportStepInput, StartUpdateResult, UpdateStepName } from './update-ports';
+import { AvailableUpdateResult, DownloadComponentOptions, DownloadedComponentFile, HeartbeatInput, HeartbeatResult, InstallationAuthorityPort, RegisterInstallationResult, ReportStepInput, StartUpdateResult, UpdateStepName } from './update-ports';
 /**
  * The CMS's machine-facing installation API over native fetch.
  *
@@ -20,7 +20,7 @@ export declare class UpdateAuthorityHttpClient implements InstallationAuthorityP
         metadata?: Record<string, unknown>;
     }): Promise<RegisterInstallationResult>;
     getUpdates(installationId: string, installationToken: string): Promise<AvailableUpdateResult>;
-    heartbeat(installationId: string, installationToken: string, input: HeartbeatInput): Promise<void>;
+    heartbeat(installationId: string, installationToken: string, input: HeartbeatInput): Promise<HeartbeatResult>;
     rotateToken(installationId: string, installationToken: string): Promise<RegisterInstallationResult>;
     startUpdate(installationId: string, installationToken: string, releaseId: string): Promise<StartUpdateResult>;
     reportStep(installationId: string, installationToken: string, jobId: string, input: ReportStepInput): Promise<{

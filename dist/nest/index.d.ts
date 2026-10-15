@@ -4,15 +4,15 @@ export { LICENSE_CLIENT_OPTIONS, type LicenseClientModuleOptions, } from './cons
 export type { LicenseClientReason, LicenseClientState } from './state';
 export { LICENSE_AUTHORITY, TOKEN_CACHE, TOKEN_VERIFIER, LicenseAuthorityUnreachableError, type AuthorityVerifyResult, type LicenseAuthorityPort, type TokenCachePort, type TokenVerifierPort, } from './ports';
 export { UpdateClientModule } from './update-client.module';
-export { UpdateClientService } from './update-client.service';
+export { UpdateClientService, type PendingActionListener, } from './update-client.service';
 export { InstallationHeartbeat } from './installation-heartbeat';
 export { UpdateRunner, type LocalStepEvent, type RunUpdateHooks, } from './update-runner';
 export { UPDATE_EXECUTOR, NoUpdateExecutorError, ReleaseManifestMissingError, type StepDetail, type UpdateExecutorPort, type UpdateStepContext, type VerifiedComponent, } from './update-executor';
-export { UPDATE_CLIENT_OPTIONS, DEFAULT_INSTALLATION_STORE_PATH, DEFAULT_DOWNLOAD_IDLE_TIMEOUT_MS, DEFAULT_HEARTBEAT_INTERVAL_MS, type UpdateClientModuleOptions, } from './update-client-constants';
+export { UPDATE_CLIENT_OPTIONS, DEFAULT_INSTALLATION_STORE_PATH, DEFAULT_DOWNLOAD_IDLE_TIMEOUT_MS, DEFAULT_HEARTBEAT_INTERVAL_MS, DEFAULT_PENDING_ACTION_POLL_MS, type UpdateClientModuleOptions, } from './update-client-constants';
 export { DEFAULT_RETRY_POLICY, withRetry, type RetryPolicy, } from './http-retry';
 export { DEFAULT_KEY_STORE_PATH } from './constants';
 export { FileKeyStore, KEY_STORE, type KeyStorePort } from './key-store';
 export { FileLicenseKeySource } from './file-license-key-source';
 export { FileInstallationTokenStore } from './file-installation-token-store';
 export type { UpdateClientReason, UpdateClientState } from './update-client-state';
-export { INSTALLATION_AUTHORITY, INSTALLATION_TOKEN_STORE, INSTALLED_VERSION_PROVIDER, LICENSE_KEY_SOURCE, InstallationAuthorityUnreachableError, InstallationForbiddenError, InstallationNotFoundError, InstallationUnauthorizedError, UpdateConflictError, type AvailableUpdateResult, type DownloadComponentOptions, type DownloadedComponentFile, type HeartbeatInput, type InstallationAuthorityPort, type InstallationCredentials, type InstallationTokenStorePort, type InstalledVersionProviderPort, type LicenseKeySourcePort, type RegisterInstallationResult, type ReleaseComponentSnapshot, type ReportStepInput, type StartUpdateResult, type UpdateStepName, type UpdateStepOutcome, } from './update-ports';
+export { INSTALLATION_AUTHORITY, INSTALLATION_TOKEN_STORE, INSTALLED_VERSION_PROVIDER, LICENSE_KEY_SOURCE, REMOTE_UPDATE_CAPABILITY, InstallationAuthorityUnreachableError, InstallationForbiddenError, InstallationNotFoundError, InstallationUnauthorizedError, UpdateConflictError, type AvailableUpdateResult, type DownloadComponentOptions, type DownloadedComponentFile, type HeartbeatInput, type HeartbeatResult, type InstallationAuthorityPort, type InstallationCredentials, type InstallationTokenStorePort, type InstalledVersionProviderPort, type LicenseKeySourcePort, type PendingAction, type RegisterInstallationResult, type ReleaseComponentSnapshot, type ReportStepInput, type StartUpdateResult, type UpdateStepName, type UpdateStepOutcome, } from './update-ports';

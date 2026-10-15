@@ -1,6 +1,8 @@
 import { UpdateClientModuleOptions } from './update-client-constants';
 import { UpdateClientState } from './update-client-state';
-import { DownloadComponentOptions, DownloadedComponentFile, InstallationAuthorityPort, InstallationTokenStorePort, InstalledVersionProviderPort, LicenseKeySourcePort, ReportStepInput, StartUpdateResult, UpdateStepName } from './update-ports';
+import { DownloadComponentOptions, DownloadedComponentFile, InstallationAuthorityPort, InstallationTokenStorePort, InstalledVersionProviderPort, LicenseKeySourcePort, PendingAction, ReportStepInput, StartUpdateResult, UpdateStepName } from './update-ports';
+/** Called with every vendor instruction the client sees; see `onPendingAction`. */
+export type PendingActionListener = (action: PendingAction) => void | Promise<void>;
 /**
  * Owns live update state and every call to the CMS's installation API.
  *
@@ -25,8 +27,18 @@ export declare class UpdateClientService {
      */
     private registering;
     private readonly retry;
+    private readonly listeners;
     constructor(options: UpdateClientModuleOptions, authority: InstallationAuthorityPort, store: InstallationTokenStorePort, keys: LicenseKeySourcePort, installedVersion?: InstalledVersionProviderPort | undefined);
     getState(): UpdateClientState;
+    /**
+     * Subscribe to vendor instructions (needs `remoteUpdates: true`). Called
+     * every time a heartbeat or check sees one — not once: the CMS keeps
+     * handing out a request until the installation starts it, so a listener
+     * that was busy the first time simply acts on a later call. The listener
+     * owns that guard; it must not start a second update while one runs.
+     * Returns an unsubscribe function.
+     */
+    onPendingAction(listener: PendingActionListener): () => void;
     /** The registered installation id, or null before the first registration. */
     getInstallationId(): Promise<string | null>;
     /**
@@ -72,6 +84,10 @@ export declare class UpdateClientService {
     private withAuth;
     private ensureRegistered;
     private register;
+    /** Adds `remote_update` to the reported capabilities when this client acts on instructions. */
+    private withCapabilities;
+    /** Hand an instruction to every listener. A listener's failure is logged, never thrown. */
+    private dispatch;
     /** A failed check keeps the previous good `updateAvailable`/version numbers, only updating `reason`/`lastCheckedAt`. */
     private fail;
 }

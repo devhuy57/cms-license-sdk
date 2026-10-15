@@ -8,11 +8,13 @@ import {
   DownloadComponentOptions,
   DownloadedComponentFile,
   HeartbeatInput,
+  HeartbeatResult,
   InstallationAuthorityPort,
   InstallationAuthorityUnreachableError,
   InstallationForbiddenError,
   InstallationNotFoundError,
   InstallationUnauthorizedError,
+  PendingAction,
   RegisterInstallationResult,
   ReleaseComponentSnapshot,
   ReportStepInput,
@@ -79,9 +81,14 @@ export class UpdateAuthorityHttpClient implements InstallationAuthorityPort {
     const data = await this.json<{
       updateAvailable?: boolean;
       currentVersion?: string | null;
-      latestRelease?: { id?: string; version?: string } | null;
+      latestRelease?: {
+        id?: string;
+        version?: string;
+        releaseNotes?: string | null;
+      } | null;
       reason?: string | null;
       updatesUntil?: string | null;
+      pendingAction?: unknown;
     }>(`${this.base}/${installationId}/updates`, { method: 'GET' }, installationToken);
 
     return {
@@ -91,6 +98,8 @@ export class UpdateAuthorityHttpClient implements InstallationAuthorityPort {
       latestReleaseId: data?.latestRelease?.id ?? null,
       reason: data?.reason ?? null,
       updatesUntil: data?.updatesUntil ?? null,
+      latestReleaseNotes: data?.latestRelease?.releaseNotes ?? null,
+      pendingAction: parsePendingAction(data?.pendingAction),
     };
   }
 
@@ -98,8 +107,8 @@ export class UpdateAuthorityHttpClient implements InstallationAuthorityPort {
     installationId: string,
     installationToken: string,
     input: HeartbeatInput,
-  ): Promise<void> {
-    await this.json(
+  ): Promise<HeartbeatResult> {
+    const data = await this.json<{ pendingAction?: unknown }>(
       `${this.base}/${installationId}/heartbeat`,
       {
         method: 'POST',
@@ -108,6 +117,7 @@ export class UpdateAuthorityHttpClient implements InstallationAuthorityPort {
       },
       installationToken,
     );
+    return { pendingAction: parsePendingAction(data?.pendingAction) };
   }
 
   async rotateToken(
@@ -439,4 +449,29 @@ function fileNameFromDisposition(header: string | null): string | null {
 /** Strip anything that could steer the write out of `destDir`. */
 function safeName(fileName: string): string {
   return fileName.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 128);
+}
+
+/**
+ * Accepts only a well-formed update instruction. Anything else — an older CMS
+ * that sends nothing, a field this client does not understand — reads as "no
+ * instruction", never as an error: a heartbeat must not fail over it.
+ */
+function parsePendingAction(raw: unknown): PendingAction | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const a = raw as Record<string, unknown>;
+  if (
+    a.type !== 'update' ||
+    typeof a.requestId !== 'string' ||
+    typeof a.releaseId !== 'string' ||
+    typeof a.version !== 'string'
+  ) {
+    return null;
+  }
+  return {
+    type: 'update',
+    requestId: a.requestId,
+    releaseId: a.releaseId,
+    version: a.version,
+    source: a.source === 'force' ? 'force' : 'admin',
+  };
 }
